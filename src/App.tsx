@@ -22,7 +22,20 @@ import { NotificationDrawer } from './components/NotificationDrawer';
 
 // Storage & Types
 import { StorageService } from './lib/storage';
-import { getStoredSupabaseConfig, saveUserToSupabase } from './lib/supabase';
+import {
+  getStoredSupabaseConfig,
+  getSupabase,
+  fetchMasterRecordsFromSupabase,
+  saveMasterRecordToSupabase,
+  deleteMasterRecordFromSupabase,
+  fetchDealsFromSupabase,
+  saveDealToSupabase,
+  fetchTeamMembersFromSupabase,
+  saveTeamMemberToSupabase,
+  fetchQuotasFromSupabase,
+  saveQuotasToSupabase,
+  saveUserToSupabase,
+} from './lib/supabase';
 import { Deal, DealStage, MasterRecord, MonthlyQuotas, TeamMember, UserAccount, MeetingCountType } from './types';
 import { checkInvoiceAging } from './lib/currency';
 
@@ -49,7 +62,7 @@ export function App() {
   const [isDataManagementOpen, setIsDataManagementOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
-  // Load Initial Data
+  // Load Initial Data & Sync Cloud in background
   const reloadData = () => {
     setUsers(StorageService.getUsers());
     setTeamMembers(StorageService.getTeamMembers());
@@ -61,8 +74,58 @@ export function App() {
     setIsSupabaseConnected(Boolean(url && anonKey));
   };
 
+  const syncFromCloud = async () => {
+    const { url, anonKey } = getStoredSupabaseConfig();
+    if (!url || !anonKey) return;
+
+    try {
+      const [cloudRecords, cloudDeals, cloudMembers, cloudQuotas] = await Promise.all([
+        fetchMasterRecordsFromSupabase(),
+        fetchDealsFromSupabase(),
+        fetchTeamMembersFromSupabase(),
+        fetchQuotasFromSupabase(),
+      ]);
+
+      if (cloudRecords && cloudRecords.length > 0) {
+        StorageService.saveMasterRecords(cloudRecords);
+        setMasterRecords(cloudRecords);
+      }
+      if (cloudDeals && cloudDeals.length > 0) {
+        StorageService.saveDeals(cloudDeals);
+        setDeals(cloudDeals);
+      }
+      if (cloudMembers && cloudMembers.length > 0) {
+        StorageService.saveTeamMembers(cloudMembers);
+        setTeamMembers(cloudMembers);
+      }
+      if (cloudQuotas) {
+        StorageService.saveQuotas(cloudQuotas);
+        setQuotas(cloudQuotas);
+      }
+      setIsSupabaseConnected(true);
+    } catch (e) {
+      console.warn('Cloud sync background error:', e);
+    }
+  };
+
   useEffect(() => {
     reloadData();
+    syncFromCloud();
+
+    // Supabase Realtime Channel
+    const client = getSupabase();
+    if (client) {
+      const channel = client
+        .channel('rosxsa-realtime-channel')
+        .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+          syncFromCloud();
+        })
+        .subscribe();
+
+      return () => {
+        client.removeChannel(channel);
+      };
+    }
   }, []);
 
   // Login & Logout Handlers
@@ -80,6 +143,7 @@ export function App() {
 
     // Default landing tab
     setCurrentTab('dashboard');
+    syncFromCloud();
   };
 
   const handleLogout = () => {
@@ -114,6 +178,7 @@ export function App() {
   const handleSaveDeal = (deal: Deal) => {
     const updated = StorageService.upsertDeal(deal);
     setDeals(updated);
+    saveDealToSupabase(deal);
   };
 
   const handleUpdateDealStage = (dealId: string, newStage: DealStage) => {
@@ -126,47 +191,64 @@ export function App() {
       };
       const updatedList = StorageService.upsertDeal(updatedDeal);
       setDeals(updatedList);
+      saveDealToSupabase(updatedDeal);
     }
   };
 
   const handleSaveMasterRecord = (record: MasterRecord) => {
     const updated = StorageService.upsertMasterRecord(record);
     setMasterRecords(updated);
+    saveMasterRecordToSupabase(record);
   };
 
   const handleConfirmPaid = (dealId: string, paidDate: string, notes?: string) => {
     const res = StorageService.markDealAsPaid(dealId, paidDate, notes);
     setDeals(res.deals);
     setMasterRecords(res.masterRecords);
+
+    const paidDeal = res.deals.find((d) => d.id === dealId);
+    if (paidDeal) saveDealToSupabase(paidDeal);
+    const paidMaster = res.masterRecords.find(
+      (m) => paidDeal && (m.email.toLowerCase() === paidDeal.email.toLowerCase() || m.domain.toLowerCase() === paidDeal.domain.toLowerCase())
+    );
+    if (paidMaster) saveMasterRecordToSupabase(paidMaster);
   };
 
   const handleSaveQuotas = (newQuotas: MonthlyQuotas) => {
     StorageService.saveQuotas(newQuotas);
     setQuotas(newQuotas);
+    saveQuotasToSupabase(newQuotas);
   };
 
   const handleDeleteMasterRecord = (id: string) => {
+    const targetRec = masterRecords.find((r) => r.id === id);
     const updated = masterRecords.filter((r) => r.id !== id);
     StorageService.saveMasterRecords(updated);
     setMasterRecords(updated);
+    deleteMasterRecordFromSupabase(id, targetRec?.email);
   };
 
   const handleBulkAddMasterRecords = (newRecords: MasterRecord[]) => {
     const merged = [...newRecords, ...masterRecords];
     StorageService.saveMasterRecords(merged);
     setMasterRecords(merged);
+    newRecords.forEach((r) => saveMasterRecordToSupabase(r));
   };
 
   // Follow-up logging from Notifications
   const handleLogFollowUp = (dealId: string, date: string, note: string) => {
     const updatedDeals = StorageService.logDealFollowUp(dealId, date, note, currentUser.fullName);
     setDeals([...updatedDeals]);
+    const deal = updatedDeals.find((d) => d.id === dealId);
+    if (deal) saveDealToSupabase(deal);
   };
 
   // Admin Approve Meeting Count
   const handleApproveMeetingCount = (masterRecordId: string, approvalType: MeetingCountType) => {
     const updated = StorageService.approveMeetingCount(masterRecordId, approvalType, currentUser.fullName);
     setMasterRecords(updated);
+    const rec = updated.find((r) => r.id === masterRecordId);
+    if (rec) saveMasterRecordToSupabase(rec);
   };
 
   const handleDismissNotification = (id: string) => {
@@ -184,6 +266,7 @@ export function App() {
       updated = StorageService.addTeamMember(member);
     }
     setTeamMembers(updated);
+    saveTeamMemberToSupabase(member);
 
     // Update or create User Account credentials
     const currentUsers = StorageService.getUsers();
