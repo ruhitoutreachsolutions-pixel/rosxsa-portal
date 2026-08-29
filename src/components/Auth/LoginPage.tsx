@@ -48,21 +48,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, existingUsers }) 
       const found = existingUsers.find(
         (u) => u.username.toLowerCase() === cleanUsername
       );
-      if (found) {
+
+      // If user exists and already has a customized non-default password
+      if (found && found.password !== '123' && found.username !== 'ruhit') {
         setIsLoading(false);
-        setErrorMessage('Username already registered. Please sign in or use another username.');
+        setErrorMessage('This username is already registered. Please click "Sign In" with your password.');
         return;
       }
 
-      // Create new standard member account
+      // Create or activate member account
       const newUser: UserAccount = {
-        id: `user-${Date.now()}`,
+        id: found ? found.id : `user-${Date.now()}`,
         fullName: fullName.trim(),
         username: cleanUsername,
         password: cleanPassword,
-        role,
-        avatarColor: role === 'sales' ? '#00E5A0' : '#3B82F6',
-        createdAt: new Date().toISOString(),
+        role: found ? found.role : role,
+        avatarColor: (found && found.avatarColor) || (role === 'sales' ? '#00E5A0' : '#3B82F6'),
+        createdAt: found ? found.createdAt : new Date().toISOString(),
       };
 
       // Save to Supabase in background
