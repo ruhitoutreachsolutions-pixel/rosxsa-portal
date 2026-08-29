@@ -1,13 +1,29 @@
 -- ==============================================================================
--- ROSxSA | Complete PostgreSQL Database Schema for Supabase Free Plan
--- Ruhit Outreach Solutions x Staff Asia Outreach Guard & Sales CRM
+-- ROSxSA | Complete PostgreSQL Database Schema for Supabase
+-- Outbound Collision Guard, Pipeline Manager & Sales CRM
 -- ==============================================================================
 
--- 1. TEAM MEMBERS TABLE
+-- 1. USER ACCOUNTS TABLE
+CREATE TABLE IF NOT EXISTS user_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  full_name TEXT NOT NULL,
+  username TEXT NOT NULL UNIQUE,
+  password TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('admin', 'sales', 'lead_gen')),
+  avatar_color TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Seed Owner User
+INSERT INTO user_accounts (full_name, username, password, role, avatar_color) VALUES
+  ('Ruhit (Owner)', 'ruhit', 'ROS@Owner2026!', 'admin', '#00C2FF')
+ON CONFLICT (username) DO NOTHING;
+
+-- 2. TEAM MEMBERS ROSTER
 CREATE TABLE IF NOT EXISTS team_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('sales', 'lead_gen', 'manager')),
+  name TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL CHECK (role IN ('sales', 'lead_gen', 'admin')),
   email TEXT,
   avatar_color TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
@@ -27,9 +43,9 @@ INSERT INTO team_members (name, role, avatar_color) VALUES
   ('Arshad', 'lead_gen', '#14B8A6'),
   ('Azraf', 'lead_gen', '#E11D48'),
   ('Shahin', 'lead_gen', '#84CC16')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) DO NOTHING;
 
--- 2. MASTER LEADS & DNC REPOSITORY
+-- 3. MASTER LEADS & DNC REPOSITORY
 CREATE TABLE IF NOT EXISTS master_records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT NOT NULL UNIQUE,
@@ -41,11 +57,14 @@ CREATE TABLE IF NOT EXISTS master_records (
   job_title TEXT,
   phone TEXT,
   linkedin_url TEXT,
-  status TEXT NOT NULL CHECK (status IN ('dnc', 'interested', 'in_conversation', 'meeting_booked', 'invoice_sent', 'paid_client', 'cold_lead')),
+  status TEXT NOT NULL CHECK (status IN ('dnc', 'interested', 'in_conversation', 'meeting_scheduled', 'meeting_done', 'demo_sent', 'invoice_sent', 'paid_client', 'cold_lead')),
   dnc_reason TEXT CHECK (dnc_reason IN ('unsubscribed', 'hostile', 'wrong_person', 'bounced', 'competitor', 'other')),
   notes TEXT,
   lead_gen_rep TEXT,
   sales_rep TEXT,
+  meeting_count_type TEXT CHECK (meeting_count_type IN ('yes', 'no', 'pending')),
+  audit_history JSONB DEFAULT '[]'::jsonb,
+  created_by TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -55,7 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_master_records_domain ON master_records(domain);
 CREATE INDEX IF NOT EXISTS idx_master_records_company ON master_records(company_name);
 CREATE INDEX IF NOT EXISTS idx_master_records_status ON master_records(status);
 
--- 3. SALES DEALS & INVOICES TABLE
+-- 4. SALES DEALS & 5-STAGE PIPELINE TABLE
 CREATE TABLE IF NOT EXISTS deals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
@@ -64,17 +83,22 @@ CREATE TABLE IF NOT EXISTS deals (
   email TEXT NOT NULL,
   domain TEXT NOT NULL,
   value_gbp NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-  stage TEXT NOT NULL CHECK (stage IN ('meeting_booked', 'discovery_pitch', 'invoice_sent', 'payment_pending', 'closed_won', 'closed_lost')),
+  stage TEXT NOT NULL CHECK (stage IN ('discovery_pitch', 'demo_sent', 'invoice_sent', 'payment_pending', 'closed_won', 'closed_lost')),
+  has_pricing_given BOOLEAN DEFAULT true,
+  discovery_date DATE,
+  demo_sent_date DATE,
   invoice_number TEXT,
   invoice_date DATE,
+  payment_pending_date DATE,
   follow_up_days INT DEFAULT 7,
-  due_alert_date DATE,
+  last_follow_up_date DATE,
+  follow_up_history JSONB DEFAULT '[]'::jsonb,
   paid_date DATE,
   sales_rep TEXT NOT NULL,
   lead_gen_rep TEXT,
   notes TEXT,
-  meeting_scheduled_date TIMESTAMPTZ,
-  meeting_completed BOOLEAN DEFAULT false,
+  meeting_completed BOOLEAN DEFAULT true,
+  meeting_count_type TEXT CHECK (meeting_count_type IN ('yes', 'no', 'pending')),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -83,7 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage);
 CREATE INDEX IF NOT EXISTS idx_deals_sales_rep ON deals(sales_rep);
 CREATE INDEX IF NOT EXISTS idx_deals_domain ON deals(domain);
 
--- 4. MONTHLY TARGETS TABLE
+-- 5. MONTHLY TARGETS & WORKING DAYS / HOLIDAYS TABLE
 CREATE TABLE IF NOT EXISTS monthly_quotas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   month INT NOT NULL,
@@ -91,30 +115,21 @@ CREATE TABLE IF NOT EXISTS monthly_quotas (
   company_target_gbp NUMERIC(12, 2) NOT NULL DEFAULT 25000.00,
   sales_targets JSONB NOT NULL DEFAULT '[]'::jsonb,
   lead_gen_targets JSONB NOT NULL DEFAULT '[]'::jsonb,
+  holidays JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(month, year)
 );
 
--- 5. ACTIVITY LOGS TABLE
-CREATE TABLE IF NOT EXISTS activity_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type TEXT NOT NULL,
-  rep_name TEXT NOT NULL,
-  details TEXT NOT NULL,
-  metadata JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Row Level Security
+-- Row Level Security (RLS)
+ALTER TABLE user_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE master_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monthly_quotas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow read/write to anon" ON team_members FOR ALL USING (true);
-CREATE POLICY "Allow read/write to anon" ON master_records FOR ALL USING (true);
-CREATE POLICY "Allow read/write to anon" ON deals FOR ALL USING (true);
-CREATE POLICY "Allow read/write to anon" ON monthly_quotas FOR ALL USING (true);
-CREATE POLICY "Allow read/write to anon" ON activity_logs FOR ALL USING (true);
+CREATE POLICY "Allow anon all" ON user_accounts FOR ALL USING (true);
+CREATE POLICY "Allow anon all" ON team_members FOR ALL USING (true);
+CREATE POLICY "Allow anon all" ON master_records FOR ALL USING (true);
+CREATE POLICY "Allow anon all" ON deals FOR ALL USING (true);
+CREATE POLICY "Allow anon all" ON monthly_quotas FOR ALL USING (true);
