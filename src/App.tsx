@@ -22,7 +22,7 @@ import { NotificationDrawer } from './components/NotificationDrawer';
 
 // Storage & Types
 import { StorageService } from './lib/storage';
-import { getStoredSupabaseConfig } from './lib/supabase';
+import { getStoredSupabaseConfig, saveUserToSupabase } from './lib/supabase';
 import { Deal, DealStage, MasterRecord, MonthlyQuotas, TeamMember, UserAccount, MeetingCountType } from './types';
 import { checkInvoiceAging } from './lib/currency';
 
@@ -190,8 +190,9 @@ export function App() {
     const cleanUsername = credentials?.username?.toLowerCase() || member.name.toLowerCase().replace(/\s+/g, '');
     const userIndex = currentUsers.findIndex((u) => u.fullName.toLowerCase() === member.name.toLowerCase() || u.username === cleanUsername);
 
+    let savedUser: UserAccount;
     if (userIndex >= 0) {
-      currentUsers[userIndex] = {
+      savedUser = {
         ...currentUsers[userIndex],
         fullName: member.name,
         username: cleanUsername,
@@ -199,8 +200,9 @@ export function App() {
         role: member.role,
         avatarColor: member.avatarColor || currentUsers[userIndex].avatarColor,
       };
+      currentUsers[userIndex] = savedUser;
     } else {
-      currentUsers.push({
+      savedUser = {
         id: `user-${Date.now()}`,
         fullName: member.name,
         username: cleanUsername,
@@ -208,11 +210,15 @@ export function App() {
         role: member.role,
         avatarColor: member.avatarColor || '#00C2FF',
         createdAt: new Date().toISOString(),
-      });
+      };
+      currentUsers.push(savedUser);
     }
 
     StorageService.saveUsers(currentUsers);
     setUsers([...currentUsers]);
+
+    // Save to Supabase Cloud DB
+    saveUserToSupabase(savedUser);
   };
 
   const handleDeleteMember = (id: string) => {

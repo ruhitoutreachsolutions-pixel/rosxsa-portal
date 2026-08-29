@@ -9,8 +9,10 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Loader2,
 } from 'lucide-react';
 import { UserAccount, TeamRole } from '../../types';
+import { authenticateWithSupabase, saveUserToSupabase } from '../../lib/supabase';
 
 interface LoginPageProps {
   onLogin: (user: UserAccount) => void;
@@ -25,8 +27,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, existingUsers }) 
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<'sales' | 'lead_gen'>('sales');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -39,26 +42,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, existingUsers }) 
         return;
       }
 
-      // Check if username already exists
+      setIsLoading(true);
+
+      // Check if username already exists locally
       const found = existingUsers.find(
         (u) => u.username.toLowerCase() === cleanUsername
       );
       if (found) {
-        setErrorMessage('Username already taken. Please pick another username or sign in.');
+        setIsLoading(false);
+        setErrorMessage('Username already registered. Please sign in or use another username.');
         return;
       }
 
-      // Create new standard member account (Admin role cannot be self-registered)
+      // Create new standard member account
       const newUser: UserAccount = {
         id: `user-${Date.now()}`,
         fullName: fullName.trim(),
         username: cleanUsername,
         password: cleanPassword,
-        role, // 'sales' or 'lead_gen'
+        role,
         avatarColor: role === 'sales' ? '#00E5A0' : '#3B82F6',
         createdAt: new Date().toISOString(),
       };
 
+      // Save to Supabase in background
+      await saveUserToSupabase(newUser);
+      setIsLoading(false);
       onLogin(newUser);
     } else {
       if (!cleanUsername || !cleanPassword) {
@@ -66,17 +75,52 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, existingUsers }) 
         return;
       }
 
-      const user = existingUsers.find(
+      setIsLoading(true);
+
+      // 1. Check Dedicated Owner credentials
+      if (cleanUsername === 'ruhit' && cleanPassword === 'ROS@Owner2026!') {
+        const ownerUser = existingUsers.find((u) => u.username === 'ruhit') || {
+          id: 'user-owner',
+          fullName: 'Ruhit (Owner)',
+          username: 'ruhit',
+          password: 'ROS@Owner2026!',
+          role: 'admin' as TeamRole,
+          avatarColor: '#00C2FF',
+          createdAt: new Date().toISOString(),
+        };
+        setIsLoading(false);
+        onLogin(ownerUser);
+        return;
+      }
+
+      // 2. Check local accounts list (matching by username or matching by prefix)
+      const localUser = existingUsers.find(
         (u) =>
-          u.username.toLowerCase() === cleanUsername &&
-          (u.password === cleanPassword || (u.username === 'ruhit' && cleanPassword === 'ROS@Owner2026!'))
+          (u.username.toLowerCase() === cleanUsername ||
+           u.username.toLowerCase() === cleanUsername.split('@')[0]) &&
+          u.password === cleanPassword
       );
 
-      if (user) {
-        onLogin(user);
-      } else {
-        setErrorMessage('Invalid username or password. Please check your credentials.');
+      if (localUser) {
+        setIsLoading(false);
+        onLogin(localUser);
+        return;
       }
+
+      // 3. Check Supabase Cloud DB directly (for accounts created on other browsers / devices)
+      try {
+        const cloudUser = await authenticateWithSupabase(cleanUsername, cleanPassword);
+        if (cloudUser) {
+          setIsLoading(false);
+          onLogin(cloudUser);
+          return;
+        }
+      } catch (err) {
+        console.warn('Supabase auth check skipped:', err);
+      }
+
+      setIsLoading(false);
+      setErrorMessage('Invalid username or password. Please verify your credentials or click "Create Account".');
     }
   };
 
@@ -158,7 +202,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, existingUsers }) 
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Farzan Ahmed"
+                  placeholder="e.g. Nayeem Ahmed"
                   className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white placeholder-brand-gray focus:outline-none focus:border-brand-cyan font-medium"
                 />
               </div>
@@ -167,7 +211,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, existingUsers }) 
 
           <div>
             <label className="block text-xs font-mono uppercase text-brand-gray mb-1">
-              Username <span className="text-brand-cyan">*</span>
+              Username or Email <span className="text-brand-cyan">*</span>
             </label>
             <div className="relative">
               <User className="w-4 h-4 text-brand-gray absolute left-3.5 top-3" />
@@ -176,7 +220,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, existingUsers }) 
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
+                placeholder="Enter username (e.g. nayeem)"
                 className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white placeholder-brand-gray focus:outline-none focus:border-brand-cyan font-medium"
               />
             </div>
@@ -217,8 +261,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, existingUsers }) 
                 onChange={(e) => setRole(e.target.value as 'sales' | 'lead_gen')}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan font-medium"
               >
-                <option value="sales">Sales Team Member (Invoices & Deals)</option>
                 <option value="lead_gen">Lead Generation Member (Scrubber & Meetings)</option>
+                <option value="sales">Sales Team Member (Invoices & Deals)</option>
               </select>
               <p className="text-[10px] text-brand-gray mt-1 font-mono">
                 🔒 Admin/Owner accounts can only be provisioned by the Portal Owner in Settings.
@@ -228,10 +272,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, existingUsers }) 
 
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-brand-cyan text-brand-black font-bold text-xs sm:text-sm hover:brightness-110 active:scale-95 transition-all shadow-cyan-glow flex items-center justify-center gap-2 mt-2"
+            disabled={isLoading}
+            className="w-full py-3 rounded-xl bg-brand-cyan text-brand-black font-bold text-xs sm:text-sm hover:brightness-110 active:scale-95 transition-all shadow-cyan-glow flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
           >
-            <span>{isRegisterMode ? 'Create Account & Sign In' : 'Sign In to Portal'}</span>
-            <ArrowRight className="w-4 h-4 stroke-[3]" />
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                <span>{isRegisterMode ? 'Create Account & Sign In' : 'Sign In to Portal'}</span>
+                <ArrowRight className="w-4 h-4 stroke-[3]" />
+              </>
+            )}
           </button>
         </form>
 
