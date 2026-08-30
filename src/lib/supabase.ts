@@ -302,6 +302,29 @@ export async function deleteMasterRecordFromSupabase(id: string, email?: string)
   }
 }
 
+export async function deleteBulkMasterRecordsFromSupabase(
+  recordsToDelete: { id: string; email?: string }[]
+): Promise<boolean> {
+  const client = getSupabase();
+  if (!client || recordsToDelete.length === 0) return false;
+
+  try {
+    const emails = recordsToDelete
+      .map((r) => r.email?.toLowerCase().trim())
+      .filter((e): e is string => Boolean(e));
+
+    const BATCH_SIZE = 200;
+    for (let i = 0; i < emails.length; i += BATCH_SIZE) {
+      const chunk = emails.slice(i, i + BATCH_SIZE);
+      await client.from('master_records').delete().in('email', chunk);
+    }
+    return true;
+  } catch (e) {
+    console.error('Failed to bulk delete master records from Supabase:', e);
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // SALES DEALS & PIPELINE CLOUD SYNC
 // ---------------------------------------------------------------------------

@@ -29,6 +29,7 @@ import {
   saveMasterRecordToSupabase,
   saveBulkMasterRecordsToSupabase,
   deleteMasterRecordFromSupabase,
+  deleteBulkMasterRecordsFromSupabase,
   fetchDealsFromSupabase,
   saveDealToSupabase,
   deleteDealFromSupabase,
@@ -337,6 +338,18 @@ export function App() {
     broadcastLocalChange();
   };
 
+  const handleBulkDeleteMasterRecords = (idsToDelete: string[]) => {
+    if (idsToDelete.length === 0) return;
+    const idSet = new Set(idsToDelete);
+    const recordsToDelete = masterRecords.filter((r) => idSet.has(r.id));
+    const updated = masterRecords.filter((r) => !idSet.has(r.id));
+
+    StorageService.saveMasterRecords(updated);
+    setMasterRecords(updated);
+    deleteBulkMasterRecordsFromSupabase(recordsToDelete);
+    broadcastLocalChange();
+  };
+
   const handleBulkAddMasterRecords = (newRecords: MasterRecord[]) => {
     const existingMap = new Map<string, MasterRecord>();
     // Index existing records
@@ -551,6 +564,7 @@ export function App() {
                 onOpenQuickLead={() => setIsQuickLeadOpen(true)}
                 onUpdateRecord={handleSaveMasterRecord}
                 onDeleteRecord={handleDeleteMasterRecord}
+                onBulkDeleteRecords={handleBulkDeleteMasterRecords}
                 onBulkAddRecords={handleBulkAddMasterRecords}
               />
             </div>

@@ -29,6 +29,10 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  CheckSquare,
+  Square,
+  AlertTriangle,
+  UserPlus,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { MasterRecord, LeadStatus, TeamMember, UserAccount, MeetingCountType } from '../../types';
@@ -41,6 +45,7 @@ interface MasterRepositoryProps {
   onOpenQuickLead: () => void;
   onUpdateRecord: (record: MasterRecord) => void;
   onDeleteRecord: (id: string) => void;
+  onBulkDeleteRecords?: (ids: string[]) => void;
   onBulkAddRecords: (records: MasterRecord[]) => void;
 }
 
@@ -51,6 +56,7 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
   onOpenQuickLead,
   onUpdateRecord,
   onDeleteRecord,
+  onBulkDeleteRecords,
   onBulkAddRecords,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -163,6 +169,106 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
     const startIndex = (safeCurrentPage - 1) * pageSize;
     return filtered.slice(startIndex, startIndex + pageSize);
   }, [filtered, safeCurrentPage, pageSize]);
+
+  // Lead Multi-Selection & Bulk Operations State
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isConfirmBulkDeleteOpen, setIsConfirmBulkDeleteOpen] = useState(false);
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isAllCurrentPageSelected = useMemo(() => {
+    if (paginatedRecords.length === 0) return false;
+    return paginatedRecords.every((r) => selectedIds.has(r.id));
+  }, [paginatedRecords, selectedIds]);
+
+  const toggleSelectCurrentPage = () => {
+    if (isAllCurrentPageSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        paginatedRecords.forEach((r) => next.delete(r.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        paginatedRecords.forEach((r) => next.add(r.id));
+        return next;
+      });
+    }
+  };
+
+  const selectAllFiltered = () => {
+    const next = new Set<string>();
+    filtered.forEach((r) => next.add(r.id));
+    setSelectedIds(next);
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleExecuteBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    if (onBulkDeleteRecords) {
+      onBulkDeleteRecords(ids);
+    } else {
+      ids.forEach((id) => onDeleteRecord(id));
+    }
+    setSelectedIds(new Set());
+    setIsConfirmBulkDeleteOpen(false);
+  };
+
+  const handleBulkStatusChange = (newStatus: LeadStatus) => {
+    if (selectedIds.size === 0) return;
+    const idSet = selectedIds;
+    records.forEach((rec) => {
+      if (idSet.has(rec.id)) {
+        onUpdateRecord({
+          ...rec,
+          status: newStatus,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+    setSelectedIds(new Set());
+  };
+
+  const handleExportSelectedCsv = () => {
+    if (selectedIds.size === 0) return;
+    const selectedRecords = records.filter((r) => selectedIds.has(r.id));
+    const csvData = selectedRecords.map((r) => ({
+      PipelineStage: r.status,
+      Email: r.email,
+      AltEmails: (r.alternateEmails || []).join('; '),
+      Domain: r.domain,
+      Company: r.companyName || '',
+      Contact: r.contactName || '',
+      City: r.city || '',
+      Country: r.country || '',
+      LeadGenRep: r.leadGenRep || 'None',
+      SalesRep: r.salesRep || '',
+      MeetingQuota: r.meetingCountType || '',
+      DateAdded: r.createdAt.split('T')[0],
+      Notes: r.notes || '',
+    }));
+
+    const csv = Papa.unparse(csvData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `ROSxSA_Selected_Leads_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Quick Inline Approval for Admins & Sales Reps
   const handleQuickApproveMeeting = (record: MasterRecord, approval: MeetingCountType) => {
@@ -473,10 +579,90 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
           </div>
         </div>
 
-        <table className="w-full text-left text-xs min-w-[1100px]">
+        {/* Multi-Selection Bulk Action Toolbar */}
+        {selectedIds.size > 0 && (
+          <div className="mb-4 p-3 sm:p-4 rounded-xl bg-brand-midnight border border-brand-cyan/40 flex flex-wrap items-center justify-between gap-3 shadow-cyan-glow animate-fade-in">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="px-2.5 py-1 rounded-lg bg-brand-cyan text-brand-black font-bold text-xs font-mono flex items-center gap-1.5">
+                <CheckSquare className="w-3.5 h-3.5" />
+                <span>{selectedIds.size.toLocaleString()} Leads Selected</span>
+              </span>
+
+              {selectedIds.size < filtered.length && (
+                <button
+                  onClick={selectAllFiltered}
+                  className="text-xs text-brand-cyan hover:underline font-semibold"
+                >
+                  Select all {filtered.length.toLocaleString()} in current filter
+                </button>
+              )}
+
+              <button
+                onClick={deselectAll}
+                className="text-xs text-brand-gray hover:text-white font-medium"
+              >
+                Deselect All
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Bulk Mark DNC */}
+              <button
+                onClick={() => handleBulkStatusChange('dnc')}
+                className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 text-xs font-semibold flex items-center gap-1 transition-colors"
+                title="Mark selected leads as DNC"
+              >
+                <ShieldBan className="w-3.5 h-3.5" />
+                <span>Mark DNC</span>
+              </button>
+
+              {/* Bulk Mark Interested */}
+              <button
+                onClick={() => handleBulkStatusChange('interested')}
+                className="px-3 py-1.5 rounded-lg bg-brand-cyan/20 hover:bg-brand-cyan/30 text-brand-cyan border border-brand-cyan/30 text-xs font-semibold flex items-center gap-1 transition-colors"
+                title="Mark selected leads as Interested"
+              >
+                <ThumbsUp className="w-3.5 h-3.5" />
+                <span>Mark Interested</span>
+              </button>
+
+              {/* Export Selected */}
+              <button
+                onClick={handleExportSelectedCsv}
+                className="px-3 py-1.5 rounded-lg bg-brand-black hover:bg-brand-midnight text-brand-white border border-white/10 text-xs font-semibold flex items-center gap-1 transition-colors"
+                title="Export selected leads to CSV"
+              >
+                <Download className="w-3.5 h-3.5 text-brand-green" />
+                <span>Export ({selectedIds.size.toLocaleString()})</span>
+              </button>
+
+              {/* Delete Selected (Destructive) */}
+              <button
+                onClick={() => setIsConfirmBulkDeleteOpen(true)}
+                className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg active:scale-95 transition-all"
+                title="Permanently remove selected leads"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Selected ({selectedIds.size.toLocaleString()})</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        <table className="w-full text-left text-xs min-w-[1150px]">
           <thead>
             {/* Column Header Titles with Filter Icons (matching user screenshot) */}
             <tr className="border-b border-brand-midnight text-brand-gray font-mono uppercase tracking-wider">
+              {/* Checkbox Column */}
+              <th className="py-3 px-3 w-10 text-center">
+                <input
+                  type="checkbox"
+                  checked={isAllCurrentPageSelected}
+                  onChange={toggleSelectCurrentPage}
+                  className="w-4 h-4 rounded bg-brand-black border border-white/20 text-brand-cyan focus:ring-0 cursor-pointer accent-brand-cyan"
+                  title={isAllCurrentPageSelected ? 'Deselect all on this page' : 'Select all on this page'}
+                />
+              </th>
               <th className="py-3 px-3 w-36 whitespace-nowrap">
                 <div className="flex items-center gap-1.5 text-brand-cyan">
                   <span>PIPELINE STAGE</span>
@@ -529,6 +715,9 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
 
             {/* Inline Column Filter Inputs Row */}
             <tr className="border-b border-brand-midnight/80 bg-brand-black/40">
+              {/* Checkbox Placeholder */}
+              <th className="py-2 px-3 text-center"></th>
+
               {/* Stage Filter */}
               <th className="py-2 px-2.5">
                 <select
@@ -642,13 +831,32 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
           <tbody className="divide-y divide-brand-midnight/60">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-12 text-brand-gray">
+                <td colSpan={10} className="text-center py-12 text-brand-gray">
                   No records matching your filter.
                 </td>
               </tr>
             ) : (
-              paginatedRecords.map((rec) => (
-                <tr key={rec.id} className="hover:bg-brand-black/50 transition-colors">
+              paginatedRecords.map((rec) => {
+                const isSelected = selectedIds.has(rec.id);
+
+                return (
+                <tr
+                  key={rec.id}
+                  className={`transition-colors ${
+                    isSelected
+                      ? 'bg-brand-cyan/15 border-l-4 border-brand-cyan'
+                      : 'hover:bg-brand-black/50'
+                  }`}
+                >
+                  {/* Selection Checkbox */}
+                  <td className="py-3 px-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelectOne(rec.id)}
+                      className="w-4 h-4 rounded bg-brand-black border border-white/20 text-brand-cyan focus:ring-0 cursor-pointer accent-brand-cyan"
+                    />
+                  </td>
                   {/* Status Badge (Guaranteed 1-Line with Icon) */}
                   <td className="py-3 px-3">
                     {rec.status === 'dnc' && (
@@ -886,8 +1094,9 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
+              );
+            })
+          )}
           </tbody>
         </table>
 
@@ -1334,6 +1543,46 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
                   Close History
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Dialog Modal */}
+      {isConfirmBulkDeleteOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-brand-navy border border-red-500/40 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-up p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/20 text-red-400 border border-red-500/40 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-brand-white">Delete Selected Leads?</h3>
+                <p className="text-xs text-brand-gray">Permanently remove records from Master Database</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-300">
+              Are you sure you want to permanently delete <strong className="text-red-400 font-bold">{selectedIds.size.toLocaleString()} selected leads</strong> from the Master Database and Supabase Cloud?
+              This action cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsConfirmBulkDeleteOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-brand-gray hover:text-white hover:bg-brand-midnight transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteBulkDelete}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-lg active:scale-95 transition-all flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Yes, Delete {selectedIds.size.toLocaleString()} Leads</span>
+              </button>
             </div>
           </div>
         </div>
