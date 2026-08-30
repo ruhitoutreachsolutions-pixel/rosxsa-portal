@@ -86,19 +86,19 @@ export function App() {
         fetchQuotasFromSupabase(),
       ]);
 
-      if (cloudRecords && cloudRecords.length > 0) {
+      if (cloudRecords !== null) {
         StorageService.saveMasterRecords(cloudRecords);
         setMasterRecords(cloudRecords);
       }
-      if (cloudDeals && cloudDeals.length > 0) {
+      if (cloudDeals !== null) {
         StorageService.saveDeals(cloudDeals);
         setDeals(cloudDeals);
       }
-      if (cloudMembers && cloudMembers.length > 0) {
+      if (cloudMembers !== null && cloudMembers.length > 0) {
         StorageService.saveTeamMembers(cloudMembers);
         setTeamMembers(cloudMembers);
       }
-      if (cloudQuotas) {
+      if (cloudQuotas !== null) {
         StorageService.saveQuotas(cloudQuotas);
         setQuotas(cloudQuotas);
       }
