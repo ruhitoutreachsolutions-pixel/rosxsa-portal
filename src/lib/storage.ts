@@ -314,6 +314,8 @@ export class StorageService {
         salesRep: deal.salesRep || existing.salesRep,
         leadGenRep: deal.leadGenRep || existing.leadGenRep,
         status: shouldUpdateStatus ? stageStatus : existing.status,
+        meetingCompleted: true,
+        meetingCountType: deal.stage === 'closed_won' || deal.stage === 'demo_sent' || deal.stage === 'invoice_sent' ? 'yes' : (existing.meetingCountType || 'yes'),
         updatedAt: new Date().toISOString(),
       };
     } else {
@@ -327,6 +329,8 @@ export class StorageService {
         status: stageStatus,
         salesRep: deal.salesRep,
         leadGenRep: deal.leadGenRep,
+        meetingCompleted: true,
+        meetingCountType: deal.stage === 'closed_won' || deal.stage === 'demo_sent' || deal.stage === 'invoice_sent' ? 'yes' : 'yes',
         notes: deal.notes || `Added via Sales Opportunity (${deal.stage})`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -366,6 +370,8 @@ export class StorageService {
           companyName: deal.companyName,
           salesRep: deal.salesRep,
           leadGenRep: deal.leadGenRep,
+          meetingCompleted: true,
+          meetingCountType: 'yes',
           updatedAt: new Date().toISOString(),
         };
       } else {
@@ -378,6 +384,8 @@ export class StorageService {
           status: 'paid_client',
           salesRep: deal.salesRep,
           leadGenRep: deal.leadGenRep,
+          meetingCompleted: true,
+          meetingCountType: 'yes',
           notes: `Paid client (£${deal.valueGbp}) - Closed by ${deal.salesRep}`,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -419,6 +427,8 @@ export class StorageService {
           ...rec,
           status: 'dnc',
           dncReason: 'other',
+          meetingCompleted: true,
+          meetingCountType: rec.meetingCountType || 'no',
           notes: rec.notes ? `${rec.notes}\n${dncNote}` : dncNote,
           updatedAt: new Date().toISOString(),
           auditHistory: [
@@ -431,7 +441,7 @@ export class StorageService {
           ],
         };
       } else {
-        // Create new Master Record as DNC
+        // Create new Master Record as DNC (Originating from completed meeting in Sales)
         masterRecords.unshift({
           id: `master-${Date.now()}`,
           email: cleanEmail,
@@ -440,6 +450,8 @@ export class StorageService {
           contactName: deal.contactName,
           status: 'dnc',
           dncReason: 'other',
+          meetingCompleted: true,
+          meetingCountType: 'no',
           notes: dncNote,
           leadGenRep: deal.leadGenRep,
           salesRep: deal.salesRep,

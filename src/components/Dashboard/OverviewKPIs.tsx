@@ -41,17 +41,32 @@ export const OverviewKPIs: React.FC<OverviewKPIsProps> = ({ deals, masterRecords
     masterRecords.filter((r) => r.status === 'meeting_scheduled').length +
     deals.filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted).length;
 
-  const masterDone = masterRecords.filter((r) => r.status === 'meeting_done').length;
-  const dealsDone = deals.filter((d) => d.meetingCompleted).length;
-  const totalMeetingDone = masterDone + dealsDone;
+  // 1. All Completed Meetings (Meeting Done, In Conversation, Paid Client, Pipeline, and Sales Deal Lost DNC)
+  const isMeetingDoneRecord = (r: MasterRecord) =>
+    r.status === 'meeting_done' ||
+    r.status === 'in_conversation' ||
+    r.status === 'paid_client' ||
+    r.status === 'demo_sent' ||
+    r.status === 'invoice_sent' ||
+    (r.status === 'dnc' && (r.meetingCompleted || r.notes?.includes('DEAL LOST') || r.auditHistory?.some((a) => a.action?.includes('Deal Lost'))));
 
-  const masterCountYes = masterRecords.filter(
-    (r) => r.status === 'meeting_done' && r.meetingCountType === 'yes'
-  ).length;
-  const dealsCountYes = deals.filter(
-    (d) => d.meetingCompleted && (d.meetingCountType === 'yes' || !d.meetingCountType)
-  ).length;
-  const totalMeetingCount = masterCountYes + dealsCountYes + totalScheduled;
+  const doneEmails = new Set<string>();
+  masterRecords.filter(isMeetingDoneRecord).forEach((r) => doneEmails.add(r.email.toLowerCase().trim()));
+  deals.filter((d) => d.meetingCompleted).forEach((d) => doneEmails.add(d.email.toLowerCase().trim()));
+  const totalMeetingDone = doneEmails.size;
+
+  // 2. Quota-Eligible Meeting Score (Scheduled + Approved YES + In Conversation + Paid Client + Pipeline)
+  const isCountYesRecord = (r: MasterRecord) =>
+    r.status === 'in_conversation' ||
+    r.status === 'paid_client' ||
+    r.status === 'demo_sent' ||
+    r.status === 'invoice_sent' ||
+    (r.status === 'meeting_done' && r.meetingCountType === 'yes');
+
+  const countYesEmails = new Set<string>();
+  masterRecords.filter(isCountYesRecord).forEach((r) => countYesEmails.add(r.email.toLowerCase().trim()));
+  deals.filter((d) => d.stage === 'closed_won' || (d.meetingCompleted && d.meetingCountType === 'yes')).forEach((d) => countYesEmails.add(d.email.toLowerCase().trim()));
+  const totalMeetingCount = countYesEmails.size + totalScheduled;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

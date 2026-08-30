@@ -64,6 +64,7 @@ export interface MasterRecord {
   salesRep?: string;
   meetingScheduledDate?: string;
   meetingCompletedDate?: string;
+  meetingCompleted?: boolean;
   meetingCountType?: MeetingCountType;
   lastFollowUpDate?: string;
   createdBy?: string;

@@ -34,18 +34,33 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
       repMasterRecords.filter((r) => r.status === 'meeting_scheduled').length +
       repDeals.filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted).length;
 
-    const meetingsDoneRecords = repMasterRecords.filter((r) => r.status === 'meeting_done');
-    const meetingsDoneDeals = repDeals.filter((d) => d.meetingCompleted);
-    const totalMeetingsDone = meetingsDoneRecords.length + meetingsDoneDeals.length;
+    // 1. All Completed Meetings (Meeting Done, In Conversation, Paid Client, Pipeline, and Sales Deal Lost DNC)
+    const isMeetingDoneRecord = (r: MasterRecord) =>
+      r.status === 'meeting_done' ||
+      r.status === 'in_conversation' ||
+      r.status === 'paid_client' ||
+      r.status === 'demo_sent' ||
+      r.status === 'invoice_sent' ||
+      (r.status === 'dnc' && (r.meetingCompleted || r.notes?.includes('DEAL LOST') || r.auditHistory?.some((a) => a.action?.includes('Deal Lost'))));
 
-    const meetingsCountYesRecords = meetingsDoneRecords.filter(
-      (r) => r.meetingCountType === 'yes'
-    ).length;
-    const meetingsCountYesDeals = meetingsDoneDeals.filter(
-      (d) => d.meetingCountType === 'yes' || !d.meetingCountType
-    ).length;
+    const doneEmails = new Set<string>();
+    repMasterRecords.filter(isMeetingDoneRecord).forEach((r) => doneEmails.add(r.email.toLowerCase().trim()));
+    repDeals.filter((d) => d.meetingCompleted).forEach((d) => doneEmails.add(d.email.toLowerCase().trim()));
+    const totalMeetingsDone = doneEmails.size;
 
-    const totalMeetingCount = meetingsCountYesRecords + meetingsCountYesDeals + meetingsScheduled;
+    // 2. Quota-Eligible Meeting Score (Scheduled + Approved YES + In Conversation + Paid Client + Pipeline)
+    const isCountYesRecord = (r: MasterRecord) =>
+      r.status === 'in_conversation' ||
+      r.status === 'paid_client' ||
+      r.status === 'demo_sent' ||
+      r.status === 'invoice_sent' ||
+      (r.status === 'meeting_done' && r.meetingCountType === 'yes');
+
+    const countYesEmails = new Set<string>();
+    repMasterRecords.filter(isCountYesRecord).forEach((r) => countYesEmails.add(r.email.toLowerCase().trim()));
+    repDeals.filter((d) => d.stage === 'closed_won' || (d.meetingCompleted && d.meetingCountType === 'yes')).forEach((d) => countYesEmails.add(d.email.toLowerCase().trim()));
+
+    const totalMeetingCount = countYesEmails.size + meetingsScheduled;
 
     const wonDealsCount = repDeals.filter((d) => d.stage === 'closed_won').length;
     const wonRevenueGbp = repDeals

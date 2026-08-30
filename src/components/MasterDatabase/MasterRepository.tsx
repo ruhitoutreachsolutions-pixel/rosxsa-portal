@@ -98,13 +98,21 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
       setEditingRecord({
         ...record,
         status: newStatus,
+        meetingCompleted: true,
         meetingCountType: defaultCountType,
       });
     } else {
       const audit = record.auditHistory || [];
+      const isPipelineLead =
+        newStatus === 'in_conversation' ||
+        newStatus === 'paid_client' ||
+        newStatus === 'demo_sent' ||
+        newStatus === 'invoice_sent';
       const updated: MasterRecord = {
         ...record,
         status: newStatus,
+        meetingCompleted: isPipelineLead ? true : record.meetingCompleted,
+        meetingCountType: isPipelineLead ? 'yes' : record.meetingCountType,
         updatedAt: new Date().toISOString(),
         auditHistory: [
           {
@@ -429,7 +437,22 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
 
                   {/* Meeting Quota Count & Approvals */}
                   <td className="py-3 px-3.5">
-                    {rec.status === 'meeting_done' ? (
+                    {rec.status === 'in_conversation' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-blue-500/20 text-blue-400 border border-blue-500/40 font-mono text-[11px] font-bold whitespace-nowrap shrink-0">
+                        <Check className="w-3.5 h-3.5 stroke-[3] shrink-0" />
+                        <span>Count: YES (In Dialogue)</span>
+                      </span>
+                    ) : rec.status === 'paid_client' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-brand-green/20 text-brand-green border border-brand-green/40 font-mono text-[11px] font-bold whitespace-nowrap shrink-0">
+                        <Check className="w-3.5 h-3.5 stroke-[3] shrink-0" />
+                        <span>Count: YES (Paid Client)</span>
+                      </span>
+                    ) : rec.status === 'demo_sent' || rec.status === 'invoice_sent' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/40 font-mono text-[11px] font-bold whitespace-nowrap shrink-0">
+                        <Check className="w-3.5 h-3.5 stroke-[3] shrink-0" />
+                        <span>Count: YES (Pipeline)</span>
+                      </span>
+                    ) : rec.status === 'meeting_done' ? (
                       rec.meetingCountType === 'pending' ? (
                         <div className="space-y-1.5">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 font-mono text-[11px] font-bold animate-pulse whitespace-nowrap shrink-0">
@@ -468,6 +491,14 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
                           <X className="w-3.5 h-3.5 shrink-0" />
                           <span>Count: NO (Done Only)</span>
                         </span>
+                      )
+                    ) : rec.status === 'dnc' ? (
+                      (rec.meetingCompleted || rec.notes?.includes('DEAL LOST') || rec.auditHistory?.some((a) => a.action?.includes('Deal Lost'))) ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-orange-500/15 text-orange-400 border border-orange-500/30 font-mono text-[10px] font-semibold whitespace-nowrap shrink-0" title="Meeting was completed in Sales, but deal was lost">
+                          <span>Meeting Done · Lost (Done Only)</span>
+                        </span>
+                      ) : (
+                        <span className="text-brand-gray font-mono text-[11px] opacity-60">— Direct DNC</span>
                       )
                     ) : (
                       <span className="text-brand-gray text-xs font-mono">—</span>
