@@ -433,7 +433,7 @@ export function App() {
   const closedRevenueGbp = closedWonDeals.reduce((sum, d) => sum + (d.valueGbp || 0), 0);
 
   return (
-    <div className="min-h-screen bg-brand-black text-brand-white flex flex-col font-sans selection:bg-brand-cyan selection:text-brand-black">
+    <div className="min-h-screen min-h-[100dvh] bg-brand-black text-brand-white flex flex-col font-sans selection:bg-brand-cyan selection:text-brand-black antialiased">
       {/* Top Header */}
       <Header
         notifications={notifications}
@@ -450,8 +450,8 @@ export function App() {
         onLogout={handleLogout}
       />
 
-      {/* Main Container with Sidebar + Content */}
-      <div className="flex-1 flex flex-col md:flex-row">
+      {/* Main Responsive Shell: Fixed/Sticky Sidebar + Flexible Main Content */}
+      <div className="flex-1 flex flex-col md:flex-row w-full min-w-0">
         {/* Navigation Sidebar */}
         <Sidebar
           currentTab={currentTab}
@@ -462,8 +462,8 @@ export function App() {
           onLogout={handleLogout}
         />
 
-        {/* Dynamic Tab Body */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+        {/* Dynamic Tab Body: Fluid Full Width with Clean Padding */}
+        <main className="flex-1 min-w-0 w-full p-3 sm:p-5 md:p-6 lg:p-8 space-y-6">
           {/* TAB 1: EXECUTIVE DASHBOARD & LEADERBOARDS (Visible to all) */}
           {currentTab === 'dashboard' && (
             <div className="space-y-6 animate-fade-in">

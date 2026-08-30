@@ -82,90 +82,125 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="w-full md:w-64 lg:w-72 bg-brand-navy border-r border-brand-midnight flex flex-col justify-between shrink-0 select-none">
-      {/* Navigation Links */}
-      <div className="p-4 space-y-1.5">
-        <div className="px-3 py-2 text-[11px] font-mono uppercase tracking-widest text-brand-gray flex items-center justify-between">
-          <span>Main Navigation</span>
-          <span className="text-[10px] text-brand-cyan capitalize">{currentUser.role} View</span>
-        </div>
+    <>
+      {/* Mobile Horizontal Navigation Bar (< md) */}
+      <div className="md:hidden w-full bg-brand-navy border-b border-brand-midnight px-3 py-2 shrink-0 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1.5 min-w-max">
+          {menuItems
+            .filter((item) => item.visible)
+            .map((item) => {
+              const Icon = item.icon;
+              const isActive = currentTab === item.id;
 
-        {menuItems
-          .filter((item) => item.visible)
-          .map((item) => {
-            const Icon = item.icon;
-            const isActive = currentTab === item.id;
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSelectTab(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-left transition-all group ${
-                  isActive
-                    ? 'bg-brand-midnight text-brand-white border border-brand-cyan/40 shadow-cyan-glow'
-                    : 'text-brand-gray hover:text-brand-white hover:bg-brand-black/40 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`p-2 rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-brand-cyan text-brand-black'
-                        : 'bg-brand-black text-brand-gray group-hover:text-brand-cyan'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className={`text-sm font-semibold ${isActive ? 'text-brand-white' : 'text-gray-200'}`}>
-                      {item.label}
-                    </div>
-                    <div className="text-[11px] text-brand-gray line-clamp-1">
-                      {item.subtitle}
-                    </div>
-                  </div>
-                </div>
-
-                {item.badge && (
-                  <span className={`text-[11px] px-2.5 py-1 rounded-lg border font-mono whitespace-nowrap shrink-0 ${item.badgeColor}`}>
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-      </div>
-
-      {/* Footer Team Info & Log Out Button */}
-      <div className="p-4 border-t border-brand-midnight bg-brand-black/30 space-y-3">
-        <div className="p-3 rounded-xl bg-brand-black border border-white/5 space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-brand-gray">Active Teams</span>
-            <span className="text-brand-cyan font-mono font-bold">{totalCount} Reps</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-brand-gray">Sales Team</span>
-            <span className="text-brand-green font-mono font-medium">{salesCount} Reps (£)</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-brand-gray">Lead Gen</span>
-            <span className="text-brand-cyan font-mono font-medium">{leadGenCount} Reps (Meetings)</span>
-          </div>
-        </div>
-
-        {/* Sidebar Direct Log Out Button */}
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-all group"
-        >
-          <LogOut className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
-          <span>Log Out ({currentUser.username})</span>
-        </button>
-
-        <div className="text-[10px] text-brand-gray text-center font-mono">
-          &copy; 2026 ROSxSA Hub
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectTab(item.id)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                    isActive
+                      ? 'bg-brand-cyan text-brand-black shadow-cyan-glow'
+                      : 'bg-brand-black/50 text-brand-gray hover:text-white border border-white/5'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{item.label}</span>
+                  {item.badge && (
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-brand-orange text-brand-black font-bold">
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
         </div>
       </div>
-    </aside>
+
+      {/* Desktop Sticky Sidebar (>= md) */}
+      <aside className="hidden md:flex md:w-64 lg:w-72 bg-brand-navy border-r border-brand-midnight flex-col justify-between shrink-0 select-none md:sticky md:top-[61px] md:h-[calc(100dvh-61px)] md:overflow-y-auto">
+        {/* Navigation Links */}
+        <div className="p-4 space-y-1.5">
+          <div className="px-3 py-2 text-[11px] font-mono uppercase tracking-widest text-brand-gray flex items-center justify-between">
+            <span>Main Navigation</span>
+            <span className="text-[10px] text-brand-cyan capitalize">{currentUser.role} View</span>
+          </div>
+
+          {menuItems
+            .filter((item) => item.visible)
+            .map((item) => {
+              const Icon = item.icon;
+              const isActive = currentTab === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectTab(item.id)}
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-left transition-all group ${
+                    isActive
+                      ? 'bg-brand-midnight text-brand-white border border-brand-cyan/40 shadow-cyan-glow'
+                      : 'text-brand-gray hover:text-brand-white hover:bg-brand-black/40 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`p-2 rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-brand-cyan text-brand-black'
+                          : 'bg-brand-black text-brand-gray group-hover:text-brand-cyan'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className={`text-sm font-semibold ${isActive ? 'text-brand-white' : 'text-gray-200'}`}>
+                        {item.label}
+                      </div>
+                      <div className="text-[11px] text-brand-gray line-clamp-1">
+                        {item.subtitle}
+                      </div>
+                    </div>
+                  </div>
+
+                  {item.badge && (
+                    <span className={`text-[11px] px-2.5 py-1 rounded-lg border font-mono whitespace-nowrap shrink-0 ${item.badgeColor}`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+        </div>
+
+        {/* Footer Team Info & Log Out Button */}
+        <div className="p-4 border-t border-brand-midnight bg-brand-black/30 space-y-3">
+          <div className="p-3 rounded-xl bg-brand-black border border-white/5 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-brand-gray">Active Teams</span>
+              <span className="text-brand-cyan font-mono font-bold">{totalCount} Reps</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-brand-gray">Sales Team</span>
+              <span className="text-brand-green font-mono font-medium">{salesCount} Reps (£)</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-brand-gray">Lead Gen</span>
+              <span className="text-brand-cyan font-mono font-medium">{leadGenCount} Reps (Meetings)</span>
+            </div>
+          </div>
+
+          {/* Sidebar Direct Log Out Button */}
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-all group"
+          >
+            <LogOut className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+            <span>Log Out ({currentUser.username})</span>
+          </button>
+
+          <div className="text-[10px] text-brand-gray text-center font-mono">
+            &copy; 2026 ROSxSA Hub
+          </div>
+        </div>
+      </aside>
+    </>
   );
 };

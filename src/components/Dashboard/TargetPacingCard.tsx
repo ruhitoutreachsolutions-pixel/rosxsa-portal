@@ -64,7 +64,7 @@ export const TargetPacingCard: React.FC<TargetPacingCardProps> = ({
       </div>
 
       {/* Main Metric Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Metric 1: Monthly Target vs Actual */}
         <div className="p-4 rounded-xl bg-brand-black border border-white/5 space-y-1.5">
           <span className="text-[11px] font-mono uppercase text-brand-gray">Company Target</span>

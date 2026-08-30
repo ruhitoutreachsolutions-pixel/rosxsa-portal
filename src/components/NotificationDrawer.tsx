@@ -63,7 +63,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+      <div className="absolute inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10">
         <div className="w-screen max-w-md bg-brand-navy border-l border-brand-midnight shadow-2xl flex flex-col">
           {/* Header */}
           <div className="px-6 py-5 border-b border-brand-midnight flex items-center justify-between bg-brand-black/50">

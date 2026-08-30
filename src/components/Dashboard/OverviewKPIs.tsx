@@ -108,7 +108,7 @@ export const OverviewKPIs: React.FC<OverviewKPIsProps> = ({ deals, masterRecords
   const totalPendingReview = pendingEmails.size;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       {/* KPI 1: Closed Won Revenue */}
       <div className="p-5 rounded-2xl bg-brand-navy border border-brand-green/30 shadow-card-dark relative overflow-hidden group hover:border-brand-green/60 transition-all flex flex-col justify-between">
         <div>
