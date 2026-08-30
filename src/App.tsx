@@ -108,24 +108,79 @@ export function App() {
     }
   };
 
+  // Multi-tab sync channel
+  const broadcastLocalChange = () => {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('rosxsa_portal_live_channel');
+        bc.postMessage({ type: 'SYNC', time: Date.now() });
+        bc.close();
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
   useEffect(() => {
     reloadData();
     syncFromCloud();
 
-    // Supabase Realtime Channel
+    // 1. Listen for BroadcastChannel events (intra-browser tabs)
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        bc = new BroadcastChannel('rosxsa_portal_live_channel');
+        bc.onmessage = () => {
+          reloadData();
+          syncFromCloud();
+        };
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // 2. Window Focus & Visibility Listener (instant sync on switching tabs)
+    const handleFocus = () => {
+      syncFromCloud();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    // 3. Fast Background Polling Fallback (every 3.5s so users NEVER need to manually refresh)
+    const pollInterval = setInterval(() => {
+      syncFromCloud();
+    }, 3500);
+
+    // 4. Supabase Realtime Channel
     const client = getSupabase();
+    let channel: any = null;
     if (client) {
-      const channel = client
-        .channel('rosxsa-realtime-channel')
-        .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+      channel = client
+        .channel('rosxsa-realtime-global')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'master_records' }, () => {
+          syncFromCloud();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, () => {
+          syncFromCloud();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, () => {
+          syncFromCloud();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_quotas' }, () => {
           syncFromCloud();
         })
         .subscribe();
-
-      return () => {
-        client.removeChannel(channel);
-      };
     }
+
+    return () => {
+      if (bc) bc.close();
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      clearInterval(pollInterval);
+      if (client && channel) {
+        client.removeChannel(channel);
+      }
+    };
   }, []);
 
   // Login & Logout Handlers
@@ -144,6 +199,7 @@ export function App() {
     // Default landing tab
     setCurrentTab('dashboard');
     syncFromCloud();
+    broadcastLocalChange();
   };
 
   const handleLogout = () => {
@@ -179,6 +235,7 @@ export function App() {
     const updated = StorageService.upsertDeal(deal);
     setDeals(updated);
     saveDealToSupabase(deal);
+    broadcastLocalChange();
   };
 
   const handleUpdateDealStage = (dealId: string, newStage: DealStage) => {
@@ -192,6 +249,7 @@ export function App() {
       const updatedList = StorageService.upsertDeal(updatedDeal);
       setDeals(updatedList);
       saveDealToSupabase(updatedDeal);
+      broadcastLocalChange();
     }
   };
 
@@ -199,6 +257,7 @@ export function App() {
     const updated = StorageService.upsertMasterRecord(record);
     setMasterRecords(updated);
     saveMasterRecordToSupabase(record);
+    broadcastLocalChange();
   };
 
   const handleConfirmPaid = (dealId: string, paidDate: string, notes?: string) => {
@@ -212,12 +271,14 @@ export function App() {
       (m) => paidDeal && (m.email.toLowerCase() === paidDeal.email.toLowerCase() || m.domain.toLowerCase() === paidDeal.domain.toLowerCase())
     );
     if (paidMaster) saveMasterRecordToSupabase(paidMaster);
+    broadcastLocalChange();
   };
 
   const handleSaveQuotas = (newQuotas: MonthlyQuotas) => {
     StorageService.saveQuotas(newQuotas);
     setQuotas(newQuotas);
     saveQuotasToSupabase(newQuotas);
+    broadcastLocalChange();
   };
 
   const handleDeleteMasterRecord = (id: string) => {
@@ -226,6 +287,7 @@ export function App() {
     StorageService.saveMasterRecords(updated);
     setMasterRecords(updated);
     deleteMasterRecordFromSupabase(id, targetRec?.email);
+    broadcastLocalChange();
   };
 
   const handleBulkAddMasterRecords = (newRecords: MasterRecord[]) => {
@@ -233,6 +295,7 @@ export function App() {
     StorageService.saveMasterRecords(merged);
     setMasterRecords(merged);
     newRecords.forEach((r) => saveMasterRecordToSupabase(r));
+    broadcastLocalChange();
   };
 
   // Follow-up logging from Notifications
@@ -241,6 +304,7 @@ export function App() {
     setDeals([...updatedDeals]);
     const deal = updatedDeals.find((d) => d.id === dealId);
     if (deal) saveDealToSupabase(deal);
+    broadcastLocalChange();
   };
 
   // Admin Approve Meeting Count
@@ -249,6 +313,7 @@ export function App() {
     setMasterRecords(updated);
     const rec = updated.find((r) => r.id === masterRecordId);
     if (rec) saveMasterRecordToSupabase(rec);
+    broadcastLocalChange();
   };
 
   const handleDismissNotification = (id: string) => {

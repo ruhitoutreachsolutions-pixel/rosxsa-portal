@@ -133,3 +133,11 @@ CREATE POLICY "Allow anon all" ON team_members FOR ALL USING (true);
 CREATE POLICY "Allow anon all" ON master_records FOR ALL USING (true);
 CREATE POLICY "Allow anon all" ON deals FOR ALL USING (true);
 CREATE POLICY "Allow anon all" ON monthly_quotas FOR ALL USING (true);
+
+-- Enable Supabase Realtime for instant broadcast without browser refresh
+ALTER PUBLICATION supabase_realtime ADD TABLE master_records;
+ALTER PUBLICATION supabase_realtime ADD TABLE deals;
+ALTER PUBLICATION supabase_realtime ADD TABLE team_members;
+ALTER PUBLICATION supabase_realtime ADD TABLE monthly_quotas;
+ALTER PUBLICATION supabase_realtime ADD TABLE user_accounts;
+
