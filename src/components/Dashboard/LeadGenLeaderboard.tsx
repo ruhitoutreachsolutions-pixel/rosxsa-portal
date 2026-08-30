@@ -43,10 +43,25 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
     repDeals.forEach((d) => interestedEmails.add(d.email.toLowerCase().trim()));
     const totalInterested = interestedEmails.size;
 
+    // Total Scheduled: All leads that had a meeting scheduled
+    const isScheduledLead = (r: MasterRecord) =>
+      r.status === 'meeting_scheduled' ||
+      r.status === 'meeting_done' ||
+      r.status === 'in_conversation' ||
+      r.status === 'demo_sent' ||
+      r.status === 'invoice_sent' ||
+      r.status === 'paid_client' ||
+      (r.status === 'dnc' && (r.meetingCompleted || r.notes?.includes('DEAL LOST') || r.auditHistory?.some((a) => a.action?.includes('Deal Lost'))));
+
     const scheduledEmails = new Set<string>();
-    repMasterRecords.filter((r) => r.status === 'meeting_scheduled').forEach((r) => scheduledEmails.add(r.email.toLowerCase().trim()));
-    repDeals.filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted).forEach((d) => scheduledEmails.add(d.email.toLowerCase().trim()));
+    repMasterRecords.filter(isScheduledLead).forEach((r) => scheduledEmails.add(r.email.toLowerCase().trim()));
+    repDeals.forEach((d) => scheduledEmails.add(d.email.toLowerCase().trim()));
     const meetingsScheduled = scheduledEmails.size;
+
+    // Upcoming scheduled meetings not yet completed
+    const upcomingScheduled =
+      repMasterRecords.filter((r) => r.status === 'meeting_scheduled' && !r.meetingCompleted).length +
+      repDeals.filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted).length;
 
     // 1. All Completed Meetings (Meeting Done, In Conversation, Paid Client, Pipeline, and Sales Deal Lost DNC)
     const isMeetingDoneRecord = (r: MasterRecord) =>
@@ -62,7 +77,7 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
     repDeals.filter((d) => d.meetingCompleted).forEach((d) => doneEmails.add(d.email.toLowerCase().trim()));
     const totalMeetingsDone = doneEmails.size;
 
-    // 2. Quota-Eligible Meeting Score (Scheduled + Approved YES + In Conversation + Paid Client + Pipeline)
+    // 2. Quota-Eligible Meeting Score (Approved YES + In Conversation + Paid Client + Pipeline + Upcoming Scheduled)
     const isCountYesRecord = (r: MasterRecord) =>
       r.status === 'in_conversation' ||
       r.status === 'paid_client' ||
@@ -74,7 +89,7 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
     repMasterRecords.filter(isCountYesRecord).forEach((r) => countYesEmails.add(r.email.toLowerCase().trim()));
     repDeals.filter((d) => d.stage === 'closed_won' || (d.meetingCompleted && d.meetingCountType === 'yes')).forEach((d) => countYesEmails.add(d.email.toLowerCase().trim()));
 
-    const totalMeetingCount = countYesEmails.size + meetingsScheduled;
+    const totalMeetingCount = countYesEmails.size + upcomingScheduled;
 
     const wonDealsCount = repDeals.filter((d) => d.stage === 'closed_won').length;
     const wonRevenueGbp = repDeals

@@ -51,10 +51,24 @@ export const OverviewKPIs: React.FC<OverviewKPIsProps> = ({ deals, masterRecords
   deals.forEach((d) => interestedEmails.add(d.email.toLowerCase().trim()));
   const totalInterested = interestedEmails.size;
 
+  const isScheduledRecord = (r: MasterRecord) =>
+    r.status === 'meeting_scheduled' ||
+    r.status === 'meeting_done' ||
+    r.status === 'in_conversation' ||
+    r.status === 'demo_sent' ||
+    r.status === 'invoice_sent' ||
+    r.status === 'paid_client' ||
+    (r.status === 'dnc' && (r.meetingCompleted || r.notes?.includes('DEAL LOST') || r.auditHistory?.some((a) => a.action?.includes('Deal Lost'))));
+
   const scheduledEmails = new Set<string>();
-  masterRecords.filter((r) => r.status === 'meeting_scheduled').forEach((r) => scheduledEmails.add(r.email.toLowerCase().trim()));
-  deals.filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted).forEach((d) => scheduledEmails.add(d.email.toLowerCase().trim()));
+  masterRecords.filter(isScheduledRecord).forEach((r) => scheduledEmails.add(r.email.toLowerCase().trim()));
+  deals.forEach((d) => scheduledEmails.add(d.email.toLowerCase().trim()));
   const totalScheduled = scheduledEmails.size;
+
+  // Upcoming scheduled meetings not yet completed
+  const upcomingScheduled =
+    masterRecords.filter((r) => r.status === 'meeting_scheduled' && !r.meetingCompleted).length +
+    deals.filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted).length;
 
   // 1. All Completed Meetings (Meeting Done, In Conversation, Paid Client, Pipeline, and Sales Deal Lost DNC)
   const isMeetingDoneRecord = (r: MasterRecord) =>
@@ -70,7 +84,7 @@ export const OverviewKPIs: React.FC<OverviewKPIsProps> = ({ deals, masterRecords
   deals.filter((d) => d.meetingCompleted).forEach((d) => doneEmails.add(d.email.toLowerCase().trim()));
   const totalMeetingDone = doneEmails.size;
 
-  // 2. Quota-Eligible Meeting Score (Scheduled + Approved YES + In Conversation + Paid Client + Pipeline)
+  // 2. Quota-Eligible Meeting Score (Approved YES + In Conversation + Paid Client + Pipeline + Upcoming Scheduled)
   const isCountYesRecord = (r: MasterRecord) =>
     r.status === 'in_conversation' ||
     r.status === 'paid_client' ||
@@ -81,7 +95,7 @@ export const OverviewKPIs: React.FC<OverviewKPIsProps> = ({ deals, masterRecords
   const countYesEmails = new Set<string>();
   masterRecords.filter(isCountYesRecord).forEach((r) => countYesEmails.add(r.email.toLowerCase().trim()));
   deals.filter((d) => d.stage === 'closed_won' || (d.meetingCompleted && d.meetingCountType === 'yes')).forEach((d) => countYesEmails.add(d.email.toLowerCase().trim()));
-  const totalMeetingCount = countYesEmails.size + totalScheduled;
+  const totalMeetingCount = countYesEmails.size + upcomingScheduled;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
