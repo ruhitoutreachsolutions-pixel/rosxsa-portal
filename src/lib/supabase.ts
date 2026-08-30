@@ -333,6 +333,28 @@ export async function saveDealToSupabase(deal: Deal): Promise<boolean> {
   }
 }
 
+export async function deleteDealFromSupabase(id: string, email?: string): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+
+  try {
+    let query = client.from('deals').delete();
+    if (id && !id.startsWith('deal-') && id.length >= 32) {
+      query = query.eq('id', id);
+    } else if (email) {
+      query = query.eq('email', email.toLowerCase().trim());
+    } else {
+      return false;
+    }
+
+    const { error } = await query;
+    return !error;
+  } catch (e) {
+    console.error('Failed to delete deal from Supabase:', e);
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // TEAM MEMBERS CLOUD SYNC
 // ---------------------------------------------------------------------------

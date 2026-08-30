@@ -53,11 +53,14 @@ export const QuickLeadModal: React.FC<QuickLeadModalProps> = ({
   const [contactName, setContactName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [website, setWebsite] = useState('');
+  const [city, setCity] = useState('');
   const [country, setCountry] = useState('United Kingdom');
   const [jobTitle, setJobTitle] = useState('');
   const [phone, setPhone] = useState('');
   const [linkedInUrl, setLinkedInUrl] = useState('');
   const [notes, setNotes] = useState('');
+  const [altEmail1, setAltEmail1] = useState('');
+  const [altEmail2, setAltEmail2] = useState('');
 
   // Meeting specific fields
   const [meetingDate, setMeetingDate] = useState(
@@ -83,14 +86,17 @@ export const QuickLeadModal: React.FC<QuickLeadModalProps> = ({
     if (!email.trim()) return;
 
     const domain = extractNormalizedDomain(email);
+    const altEmails = [altEmail1.trim().toLowerCase(), altEmail2.trim().toLowerCase()].filter(Boolean);
 
     const masterRecord: MasterRecord = {
       id: `lead-${Date.now()}`,
       email: email.trim().toLowerCase(),
+      alternateEmails: altEmails.length > 0 ? altEmails : undefined,
       domain: domain || website || 'unknown',
       companyName: companyName.trim() || undefined,
       contactName: contactName.trim() || undefined,
       website: website.trim() || undefined,
+      city: city.trim() || undefined,
       country: country.trim() || undefined,
       jobTitle: jobTitle.trim() || undefined,
       phone: phone.trim() || undefined,
@@ -116,16 +122,18 @@ export const QuickLeadModal: React.FC<QuickLeadModalProps> = ({
         companyName: companyName.trim() || domain || 'New Client',
         contactName: contactName.trim() || undefined,
         email: email.trim().toLowerCase(),
+        alternateEmails: altEmails.length > 0 ? altEmails : undefined,
         domain: domain || 'unknown',
-        valueGbp: parseFloat(estimatedValueGbp) || 2000,
+        valueGbp: parseFloat(estimatedValueGbp) || 0,
         stage: 'discovery_pitch',
+        hasPricingGiven: false,
+        discoveryDate: meetingDate,
         salesRep: assignedSalesRep,
         leadGenRep,
-        notes: `Meeting booked by ${leadGenRep}. ${notes}`,
         meetingScheduledDate: meetingDate,
         meetingCompleted: false,
         meetingCountType,
-        followUpDays: 7,
+        notes: notes.trim() || undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -277,6 +285,34 @@ export const QuickLeadModal: React.FC<QuickLeadModalProps> = ({
             </div>
           </div>
 
+          {/* Alternative Email Addresses for Anti-Collision */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-mono uppercase text-brand-gray mb-1.5">
+                Alternative Email 1 (Optional)
+              </label>
+              <input
+                type="email"
+                value={altEmail1}
+                onChange={(e) => setAltEmail1(e.target.value)}
+                placeholder="alternate@company.co.uk"
+                className="w-full px-3.5 py-2 rounded-xl bg-brand-black border border-brand-midnight text-brand-white placeholder-brand-gray text-xs focus:outline-none focus:border-brand-cyan"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono uppercase text-brand-gray mb-1.5">
+                Alternative Email 2 (Optional)
+              </label>
+              <input
+                type="email"
+                value={altEmail2}
+                onChange={(e) => setAltEmail2(e.target.value)}
+                placeholder="director.personal@gmail.com"
+                className="w-full px-3.5 py-2 rounded-xl bg-brand-black border border-brand-midnight text-brand-white placeholder-brand-gray text-xs focus:outline-none focus:border-brand-cyan"
+              />
+            </div>
+          </div>
+
           {/* Meeting Specific Section */}
           {status === 'meeting_scheduled' && (
             <div className="p-4 rounded-xl bg-brand-green/10 border border-brand-green/30 space-y-3">
@@ -397,6 +433,20 @@ export const QuickLeadModal: React.FC<QuickLeadModalProps> = ({
                     value={website}
                     onChange={(e) => setWebsite(e.target.value)}
                     placeholder="https://acme.co.uk"
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-brand-black border border-brand-midnight text-xs text-brand-white placeholder-brand-gray focus:outline-none focus:border-brand-cyan"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] text-brand-gray mb-1">City</label>
+                <div className="relative">
+                  <MapPin className="w-3.5 h-3.5 text-brand-gray absolute left-2.5 top-2.5" />
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="e.g. London"
                     className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-brand-black border border-brand-midnight text-xs text-brand-white placeholder-brand-gray focus:outline-none focus:border-brand-cyan"
                   />
                 </div>

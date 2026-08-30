@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   X,
   Check,
+  Trash2,
   PoundSterling,
   Building,
   User,
@@ -22,6 +23,7 @@ interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaveDeal: (deal: Deal) => void;
+  onDeleteDeal?: (dealId: string) => void;
   dealToEdit?: Deal | null;
   teamMembers: TeamMember[];
 }
@@ -30,6 +32,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   isOpen,
   onClose,
   onSaveDeal,
+  onDeleteDeal,
   dealToEdit,
   teamMembers,
 }) => {
@@ -61,6 +64,8 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [notes, setNotes] = useState('');
   const [lostReason, setLostReason] = useState('Pricing / Budget');
   const [meetingCountType, setMeetingCountType] = useState<MeetingCountType>('yes');
+  const [altEmail1, setAltEmail1] = useState('');
+  const [altEmail2, setAltEmail2] = useState('');
 
   useEffect(() => {
     if (dealToEdit) {
@@ -68,6 +73,8 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setCompanyName(dealToEdit.companyName);
       setContactName(dealToEdit.contactName || '');
       setEmail(dealToEdit.email);
+      setAltEmail1(dealToEdit.alternateEmails?.[0] || '');
+      setAltEmail2(dealToEdit.alternateEmails?.[1] || '');
       setStage(dealToEdit.stage);
       setHasPricingGiven(dealToEdit.hasPricingGiven !== false && dealToEdit.valueGbp > 0);
       setValueGbp(dealToEdit.valueGbp ? dealToEdit.valueGbp.toString() : '');
@@ -87,6 +94,8 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setCompanyName('');
       setContactName('');
       setEmail('');
+      setAltEmail1('');
+      setAltEmail2('');
       setStage('discovery_pitch');
       setHasPricingGiven(false);
       setValueGbp('');
@@ -114,12 +123,15 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       ? `${notes.trim() ? notes.trim() + ' | ' : ''}Lost Reason: ${lostReason}`
       : notes.trim() || undefined;
 
+    const altEmails = [altEmail1.trim().toLowerCase(), altEmail2.trim().toLowerCase()].filter(Boolean);
+
     const deal: Deal = {
       id: dealToEdit ? dealToEdit.id : `deal-${Date.now()}`,
       title: title.trim() || `${companyName} Partnership`,
       companyName: companyName.trim(),
       contactName: contactName.trim() || undefined,
       email: email.trim().toLowerCase(),
+      alternateEmails: altEmails.length > 0 ? altEmails : undefined,
       domain: domain || 'unknown',
       valueGbp: parsedVal,
       stage,
@@ -445,6 +457,30 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             />
           </div>
 
+          {/* Alternative Email Addresses for Anti-Collision & Matching */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] text-brand-gray mb-1">Alternative Email 1 (Optional)</label>
+              <input
+                type="email"
+                value={altEmail1}
+                onChange={(e) => setAltEmail1(e.target.value)}
+                placeholder="e.g. sarah.personal@gmail.com"
+                className="w-full px-3 py-2 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] text-brand-gray mb-1">Alternative Email 2 (Optional)</label>
+              <input
+                type="email"
+                value={altEmail2}
+                onChange={(e) => setAltEmail2(e.target.value)}
+                placeholder="e.g. finance@synthex.ai"
+                className="w-full px-3 py-2 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan font-mono"
+              />
+            </div>
+          </div>
+
           {/* Rep Attribution */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -540,24 +576,42 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-3 border-t border-brand-midnight flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-brand-gray hover:text-brand-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={`px-5 py-2.5 rounded-xl font-bold text-xs hover:brightness-110 active:scale-95 transition-all ${
-                stage === 'closed_lost'
-                  ? 'bg-red-500 text-white shadow-orange-glow'
-                  : 'bg-brand-green text-brand-black shadow-green-glow'
-              }`}
-            >
-              {stage === 'closed_lost' ? '❌ Mark Deal as Lost & Move to DNC' : 'Save Deal & Update Stage'}
-            </button>
+          <div className="pt-3 border-t border-brand-midnight flex items-center justify-between gap-3">
+            {dealToEdit && onDeleteDeal ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Are you sure you want to delete the deal for "${dealToEdit.companyName}" (${dealToEdit.email})?`)) {
+                    onDeleteDeal(dealToEdit.id);
+                    onClose();
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Deal</span>
+              </button>
+            ) : <div />}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-brand-gray hover:text-brand-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={`px-5 py-2.5 rounded-xl font-bold text-xs hover:brightness-110 active:scale-95 transition-all ${
+                  stage === 'closed_lost'
+                    ? 'bg-red-500 text-white shadow-orange-glow'
+                    : 'bg-brand-green text-brand-black shadow-green-glow'
+                }`}
+              >
+                {stage === 'closed_lost' ? '❌ Mark Deal as Lost & Move to DNC' : 'Save Deal & Update Stage'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

@@ -19,6 +19,12 @@ import {
   MessageSquare,
   Send,
   FileText,
+  Filter,
+  FilterX,
+  MapPin,
+  Mail,
+  Building,
+  Globe,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { MasterRecord, LeadStatus, TeamMember, UserAccount, MeetingCountType } from '../../types';
@@ -48,15 +54,75 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MasterRecord | null>(null);
   const [viewHistoryRecord, setViewHistoryRecord] = useState<MasterRecord | null>(null);
+  const [showColFilters, setShowColFilters] = useState(true);
+
+  // Per-column filter states (matching user request)
+  const [colFilters, setColFilters] = useState({
+    status: 'all',
+    email: '',
+    contactName: '',
+    city: '',
+    companyName: '',
+    leadGenRep: 'all',
+    salesRep: 'all',
+    date: '',
+  });
 
   const leadGenReps = teamMembers.filter((m) => m.role === 'lead_gen');
+  const salesReps = teamMembers.filter((m) => m.role === 'sales');
   const isAdmin = currentUser.role === 'admin';
   const isSales = currentUser.role === 'sales';
   const isLeadGen = currentUser.role === 'lead_gen';
 
+  const isAnyColFilterActive = Object.entries(colFilters).some(
+    ([k, v]) => v !== '' && v !== 'all'
+  );
+
+  const resetAllFilters = () => {
+    setColFilters({
+      status: 'all',
+      email: '',
+      contactName: '',
+      city: '',
+      companyName: '',
+      leadGenRep: 'all',
+      salesRep: 'all',
+      date: '',
+    });
+    setSearchQuery('');
+    setStatusFilter('all');
+  };
+
   // Filtered records
   const filtered = records.filter((rec) => {
     if (statusFilter !== 'all' && rec.status !== statusFilter) return false;
+    if (colFilters.status !== 'all' && rec.status !== colFilters.status) return false;
+
+    if (colFilters.email) {
+      const q = colFilters.email.toLowerCase();
+      const matchPrimary = rec.email.toLowerCase().includes(q) || rec.domain.toLowerCase().includes(q);
+      const matchAlt = rec.alternateEmails?.some((alt) => alt.toLowerCase().includes(q));
+      if (!matchPrimary && !matchAlt) return false;
+    }
+
+    if (colFilters.contactName && (!rec.contactName || !rec.contactName.toLowerCase().includes(colFilters.contactName.toLowerCase()))) {
+      return false;
+    }
+
+    if (colFilters.companyName && (!rec.companyName || !rec.companyName.toLowerCase().includes(colFilters.companyName.toLowerCase()))) {
+      return false;
+    }
+
+    if (colFilters.city) {
+      const q = colFilters.city.toLowerCase();
+      const matchCity = rec.city && rec.city.toLowerCase().includes(q);
+      const matchCountry = rec.country && rec.country.toLowerCase().includes(q);
+      if (!matchCity && !matchCountry) return false;
+    }
+
+    if (colFilters.leadGenRep !== 'all' && rec.leadGenRep !== colFilters.leadGenRep) return false;
+    if (colFilters.salesRep !== 'all' && rec.salesRep !== colFilters.salesRep) return false;
+    if (colFilters.date && !rec.createdAt.includes(colFilters.date)) return false;
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -65,8 +131,11 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
         rec.domain.toLowerCase().includes(q) ||
         (rec.companyName && rec.companyName.toLowerCase().includes(q)) ||
         (rec.contactName && rec.contactName.toLowerCase().includes(q)) ||
+        (rec.city && rec.city.toLowerCase().includes(q)) ||
+        (rec.country && rec.country.toLowerCase().includes(q)) ||
         (rec.leadGenRep && rec.leadGenRep.toLowerCase().includes(q)) ||
-        (rec.salesRep && rec.salesRep.toLowerCase().includes(q))
+        (rec.salesRep && rec.salesRep.toLowerCase().includes(q)) ||
+        (rec.alternateEmails && rec.alternateEmails.some((alt) => alt.toLowerCase().includes(q)))
       );
     }
     return true;
@@ -329,22 +398,197 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
 
       {/* Main Database Table Container */}
       <div className="p-6 rounded-2xl bg-brand-navy border border-brand-midnight shadow-card-dark overflow-x-auto">
-        <table className="w-full text-left text-xs min-w-[1000px]">
+        <div className="flex items-center justify-between pb-3 border-b border-brand-midnight">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-bold text-brand-white uppercase">
+              Master Lead & Client Database ({filtered.length} of {records.length})
+            </span>
+            {isAnyColFilterActive && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 animate-pulse">
+                Filtered Active
+              </span>
+            )}
+          </div>
+          {isAnyColFilterActive && (
+            <button
+              onClick={resetAllFilters}
+              className="text-xs text-red-400 hover:text-red-300 font-semibold flex items-center gap-1 transition-colors"
+            >
+              <FilterX className="w-3.5 h-3.5" />
+              <span>Clear Column Filters</span>
+            </button>
+          )}
+        </div>
+
+        <table className="w-full text-left text-xs min-w-[1100px]">
           <thead>
+            {/* Column Header Titles with Filter Icons (matching user screenshot) */}
             <tr className="border-b border-brand-midnight text-brand-gray font-mono uppercase tracking-wider">
-              <th className="py-3 px-3.5 w-36 whitespace-nowrap">Status</th>
-              <th className="py-3 px-3.5 min-w-[200px] whitespace-nowrap">Email & Domain</th>
-              <th className="py-3 px-3.5 min-w-[180px] whitespace-nowrap">Company & Contact</th>
-              <th className="py-3 px-3.5 w-32 whitespace-nowrap">Lead Rep</th>
-              <th className="py-3 px-3.5 min-w-[230px] whitespace-nowrap">Meeting Quota Count & Approvals</th>
-              <th className="py-3 px-3.5 w-36 whitespace-nowrap">Added By & Date</th>
-              <th className="py-3 px-3.5 w-48 text-right whitespace-nowrap">Update Status / Action</th>
+              <th className="py-3 px-3 w-36 whitespace-nowrap">
+                <div className="flex items-center gap-1.5 text-brand-cyan">
+                  <span>PIPELINE STAGE</span>
+                  <Filter className="w-3 h-3 text-brand-cyan/70" />
+                </div>
+              </th>
+              <th className="py-3 px-3 min-w-[220px] whitespace-nowrap">
+                <div className="flex items-center gap-1.5 text-brand-cyan">
+                  <span>EMAIL ADDRESS</span>
+                  <Filter className="w-3 h-3 text-brand-cyan/70" />
+                </div>
+              </th>
+              <th className="py-3 px-3 min-w-[160px] whitespace-nowrap">
+                <div className="flex items-center gap-1.5 text-brand-cyan">
+                  <span>COMPANY NAME</span>
+                  <Filter className="w-3 h-3 text-brand-cyan/70" />
+                </div>
+              </th>
+              <th className="py-3 px-3 min-w-[160px] whitespace-nowrap">
+                <div className="flex items-center gap-1.5 text-brand-cyan">
+                  <span>CONTACT / NAME</span>
+                  <Filter className="w-3 h-3 text-brand-cyan/70" />
+                </div>
+              </th>
+              <th className="py-3 px-3 min-w-[130px] whitespace-nowrap">
+                <div className="flex items-center gap-1.5 text-brand-cyan">
+                  <span>CITY / REGION</span>
+                  <Filter className="w-3 h-3 text-brand-cyan/70" />
+                </div>
+              </th>
+              <th className="py-3 px-3 w-32 whitespace-nowrap">
+                <div className="flex items-center gap-1.5 text-brand-cyan">
+                  <span>LEAD GEN REP</span>
+                  <Filter className="w-3 h-3 text-brand-cyan/70" />
+                </div>
+              </th>
+              <th className="py-3 px-3 min-w-[220px] whitespace-nowrap">
+                <div className="flex items-center gap-1 text-brand-gray">
+                  <span>MEETING QUOTA COUNT</span>
+                </div>
+              </th>
+              <th className="py-3 px-3 w-32 whitespace-nowrap">
+                <div className="flex items-center gap-1.5 text-brand-cyan">
+                  <span>DATE ADDED</span>
+                  <Filter className="w-3 h-3 text-brand-cyan/70" />
+                </div>
+              </th>
+              <th className="py-3 px-3 w-40 text-right whitespace-nowrap">ACTIONS</th>
+            </tr>
+
+            {/* Inline Column Filter Inputs Row */}
+            <tr className="border-b border-brand-midnight/80 bg-brand-black/40">
+              {/* Stage Filter */}
+              <th className="py-2 px-2.5">
+                <select
+                  value={colFilters.status}
+                  onChange={(e) => setColFilters({ ...colFilters, status: e.target.value })}
+                  className="w-full px-2 py-1 rounded-lg bg-brand-midnight border border-white/10 text-[11px] text-brand-white focus:outline-none focus:border-brand-cyan"
+                >
+                  <option value="all">All Stages</option>
+                  <option value="interested">Interested</option>
+                  <option value="meeting_scheduled">Scheduled</option>
+                  <option value="meeting_done">Meeting Done</option>
+                  <option value="in_conversation">In Dialogue</option>
+                  <option value="demo_sent">Demo Sent</option>
+                  <option value="invoice_sent">Invoice Sent</option>
+                  <option value="paid_client">Paid Client</option>
+                  <option value="dnc">DNC</option>
+                </select>
+              </th>
+
+              {/* Email Filter */}
+              <th className="py-2 px-2.5">
+                <input
+                  type="text"
+                  value={colFilters.email}
+                  onChange={(e) => setColFilters({ ...colFilters, email: e.target.value })}
+                  placeholder="Filter email/domain..."
+                  className="w-full px-2 py-1 rounded-lg bg-brand-midnight border border-white/10 text-[11px] text-brand-white placeholder-brand-gray focus:outline-none focus:border-brand-cyan font-mono"
+                />
+              </th>
+
+              {/* Company Filter */}
+              <th className="py-2 px-2.5">
+                <input
+                  type="text"
+                  value={colFilters.companyName}
+                  onChange={(e) => setColFilters({ ...colFilters, companyName: e.target.value })}
+                  placeholder="Filter company..."
+                  className="w-full px-2 py-1 rounded-lg bg-brand-midnight border border-white/10 text-[11px] text-brand-white placeholder-brand-gray focus:outline-none focus:border-brand-cyan"
+                />
+              </th>
+
+              {/* Contact Filter */}
+              <th className="py-2 px-2.5">
+                <input
+                  type="text"
+                  value={colFilters.contactName}
+                  onChange={(e) => setColFilters({ ...colFilters, contactName: e.target.value })}
+                  placeholder="Filter name..."
+                  className="w-full px-2 py-1 rounded-lg bg-brand-midnight border border-white/10 text-[11px] text-brand-white placeholder-brand-gray focus:outline-none focus:border-brand-cyan"
+                />
+              </th>
+
+              {/* City Filter */}
+              <th className="py-2 px-2.5">
+                <input
+                  type="text"
+                  value={colFilters.city}
+                  onChange={(e) => setColFilters({ ...colFilters, city: e.target.value })}
+                  placeholder="City / Country..."
+                  className="w-full px-2 py-1 rounded-lg bg-brand-midnight border border-white/10 text-[11px] text-brand-white placeholder-brand-gray focus:outline-none focus:border-brand-cyan"
+                />
+              </th>
+
+              {/* Lead Rep Filter */}
+              <th className="py-2 px-2.5">
+                <select
+                  value={colFilters.leadGenRep}
+                  onChange={(e) => setColFilters({ ...colFilters, leadGenRep: e.target.value })}
+                  className="w-full px-2 py-1 rounded-lg bg-brand-midnight border border-white/10 text-[11px] text-brand-white focus:outline-none focus:border-brand-cyan"
+                >
+                  <option value="all">All Reps</option>
+                  {leadGenReps.map((r) => (
+                    <option key={r.id} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </th>
+
+              {/* Meeting Count */}
+              <th className="py-2 px-2.5 text-center text-brand-gray font-mono text-[10px]">
+                —
+              </th>
+
+              {/* Date Filter */}
+              <th className="py-2 px-2.5">
+                <input
+                  type="text"
+                  value={colFilters.date}
+                  onChange={(e) => setColFilters({ ...colFilters, date: e.target.value })}
+                  placeholder="YYYY-MM-DD"
+                  className="w-full px-2 py-1 rounded-lg bg-brand-midnight border border-white/10 text-[11px] text-brand-white placeholder-brand-gray focus:outline-none focus:border-brand-cyan font-mono"
+                />
+              </th>
+
+              {/* Reset Action */}
+              <th className="py-2 px-2.5 text-right">
+                {isAnyColFilterActive && (
+                  <button
+                    onClick={resetAllFilters}
+                    className="p-1 rounded bg-red-500/20 text-red-300 hover:bg-red-500 hover:text-white transition-all text-[10px] font-bold"
+                    title="Clear All Filters"
+                  >
+                    Clear
+                  </button>
+                )}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-brand-midnight/60">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-12 text-brand-gray">
+                <td colSpan={9} className="text-center py-12 text-brand-gray">
                   No records matching your filter.
                 </td>
               </tr>
@@ -352,7 +596,7 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
               filtered.map((rec) => (
                 <tr key={rec.id} className="hover:bg-brand-black/50 transition-colors">
                   {/* Status Badge (Guaranteed 1-Line with Icon) */}
-                  <td className="py-3 px-3.5">
+                  <td className="py-3 px-3">
                     {rec.status === 'dnc' && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 whitespace-nowrap shrink-0">
                         <ShieldBan className="w-3.5 h-3.5 shrink-0" />
@@ -408,35 +652,63 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
                     )}
                   </td>
 
-                  {/* Email & Domain */}
-                  <td className="py-3 px-3.5">
+                  {/* Email & Alternative Emails */}
+                  <td className="py-3 px-3">
                     <div className="font-semibold text-brand-white break-all">{rec.email}</div>
                     <div className="text-[11px] text-brand-gray font-mono whitespace-nowrap">@{rec.domain}</div>
+                    {rec.alternateEmails && rec.alternateEmails.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {rec.alternateEmails.map((alt, i) => (
+                          <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-black text-brand-cyan border border-brand-cyan/30">
+                            Alt: {alt}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </td>
 
-                  {/* Company & Contact (Clean Multi-line without broken phrases) */}
-                  <td className="py-3 px-3.5">
+                  {/* Company Name */}
+                  <td className="py-3 px-3">
                     <div className="font-bold text-brand-white">{rec.companyName || '—'}</div>
+                    {rec.website && (
+                      <div className="text-[11px] text-brand-cyan font-mono truncate max-w-[150px]">
+                        {rec.website.replace('https://', '').replace('http://', '')}
+                      </div>
+                    )}
+                  </td>
+
+                  {/* Contact Person */}
+                  <td className="py-3 px-3">
+                    <div className="font-semibold text-brand-white">{rec.contactName || '—'}</div>
                     <div className="text-[11px] text-brand-gray">
-                      {rec.contactName ? (
-                        <span>
-                          {rec.contactName} <span className="opacity-70 font-mono">({rec.jobTitle || 'Lead'})</span>
-                        </span>
+                      {rec.jobTitle ? (
+                        <span className="opacity-80 font-mono">({rec.jobTitle})</span>
                       ) : (
                         '—'
                       )}
                     </div>
                   </td>
 
+                  {/* City / Country */}
+                  <td className="py-3 px-3 text-brand-gray font-medium">
+                    <div className="flex items-center gap-1 text-xs">
+                      <MapPin className="w-3 h-3 text-brand-gray shrink-0" />
+                      <span className="text-brand-white">{rec.city || rec.country || '—'}</span>
+                    </div>
+                    {rec.city && rec.country && (
+                      <div className="text-[10px] text-brand-gray ml-4">{rec.country}</div>
+                    )}
+                  </td>
+
                   {/* Lead Gen Rep */}
-                  <td className="py-3 px-3.5">
+                  <td className="py-3 px-3">
                     <span className="inline-flex items-center px-2.5 py-1 rounded bg-brand-black border border-brand-cyan/30 text-xs font-semibold text-brand-cyan font-mono whitespace-nowrap shrink-0">
                       {rec.leadGenRep || 'Unassigned'}
                     </span>
                   </td>
 
                   {/* Meeting Quota Count & Approvals */}
-                  <td className="py-3 px-3.5">
+                  <td className="py-3 px-3">
                     {rec.status === 'in_conversation' ? (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-blue-500/20 text-blue-400 border border-blue-500/40 font-mono text-[11px] font-bold whitespace-nowrap shrink-0">
                         <Check className="w-3.5 h-3.5 stroke-[3] shrink-0" />
@@ -505,31 +777,30 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
                     )}
                   </td>
 
-                  {/* Added By & Date (Admin Edit History) */}
-                  <td className="py-3 px-3.5">
-                    <div className="text-xs font-medium text-brand-white flex items-center gap-1.5 whitespace-nowrap">
-                      <User className="w-3.5 h-3.5 text-brand-gray shrink-0" />
-                      <span>{rec.createdBy || rec.leadGenRep || 'Staff Rep'}</span>
-                    </div>
-                    <div className="text-[11px] text-brand-gray font-mono whitespace-nowrap">
+                  {/* Added Date */}
+                  <td className="py-3 px-3">
+                    <div className="text-[11px] text-brand-white font-mono whitespace-nowrap">
                       {rec.createdAt ? rec.createdAt.split('T')[0] : 'Historical'}
+                    </div>
+                    <div className="text-[10px] text-brand-gray truncate max-w-[100px]">
+                      {rec.createdBy || rec.leadGenRep || 'Outbound'}
                     </div>
                   </td>
 
                   {/* Actions & History View */}
-                  <td className="py-3 px-3.5 text-right">
+                  <td className="py-3 px-3 text-right">
                     <div className="flex items-center justify-end gap-1.5 shrink-0">
                       <select
                         value={rec.status}
                         onChange={(e) => handleQuickStatusChange(rec, e.target.value as LeadStatus)}
-                        className="px-2.5 py-1 rounded-lg bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan font-semibold whitespace-nowrap"
+                        className="px-2 py-1 rounded-lg bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan font-semibold whitespace-nowrap"
                       >
                         <option value="interested">Interested</option>
-                        <option value="meeting_scheduled">Meeting Scheduled</option>
-                        <option value="meeting_done">Meeting Done</option>
-                        <option value="in_conversation">In-Conversation</option>
-                        <option value="dnc">Do Not Contact (DNC)</option>
-                        <option value="paid_client">Paid Client</option>
+                        <option value="meeting_scheduled">Scheduled</option>
+                        <option value="meeting_done">Done</option>
+                        <option value="in_conversation">Dialogue</option>
+                        <option value="dnc">DNC</option>
+                        <option value="paid_client">Paid</option>
                       </select>
 
                       {/* Admin View History Button */}
@@ -586,7 +857,107 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveStatusModal} className="p-6 space-y-4">
+            <form onSubmit={handleSaveStatusModal} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono uppercase text-brand-gray mb-1">
+                    Company Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editingRecord.companyName || ''}
+                    onChange={(e) =>
+                      setEditingRecord({ ...editingRecord, companyName: e.target.value })
+                    }
+                    placeholder="e.g. Acme Corp"
+                    className="w-full px-3 py-2 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono uppercase text-brand-gray mb-1">
+                    Contact Person Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editingRecord.contactName || ''}
+                    onChange={(e) =>
+                      setEditingRecord({ ...editingRecord, contactName: e.target.value })
+                    }
+                    placeholder="e.g. John Smith"
+                    className="w-full px-3 py-2 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono uppercase text-brand-gray mb-1">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    value={editingRecord.city || ''}
+                    onChange={(e) =>
+                      setEditingRecord({ ...editingRecord, city: e.target.value })
+                    }
+                    placeholder="e.g. London"
+                    className="w-full px-3 py-2 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono uppercase text-brand-gray mb-1">
+                    Country
+                  </label>
+                  <input
+                    type="text"
+                    value={editingRecord.country || ''}
+                    onChange={(e) =>
+                      setEditingRecord({ ...editingRecord, country: e.target.value })
+                    }
+                    placeholder="United Kingdom"
+                    className="w-full px-3 py-2 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan"
+                  />
+                </div>
+              </div>
+
+              {/* Alternative Email Addresses */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono uppercase text-brand-gray mb-1">
+                    Alternative Email 1
+                  </label>
+                  <input
+                    type="email"
+                    value={editingRecord.alternateEmails?.[0] || ''}
+                    onChange={(e) => {
+                      const currentAlts = [...(editingRecord.alternateEmails || [])];
+                      currentAlts[0] = e.target.value;
+                      const cleaned = currentAlts.map((a) => a.trim()).filter(Boolean);
+                      setEditingRecord({ ...editingRecord, alternateEmails: cleaned });
+                    }}
+                    placeholder="alternate@company.co.uk"
+                    className="w-full px-3 py-2 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono uppercase text-brand-gray mb-1">
+                    Alternative Email 2
+                  </label>
+                  <input
+                    type="email"
+                    value={editingRecord.alternateEmails?.[1] || ''}
+                    onChange={(e) => {
+                      const currentAlts = [...(editingRecord.alternateEmails || [])];
+                      currentAlts[1] = e.target.value;
+                      const cleaned = currentAlts.map((a) => a.trim()).filter(Boolean);
+                      setEditingRecord({ ...editingRecord, alternateEmails: cleaned });
+                    }}
+                    placeholder="personal@gmail.com"
+                    className="w-full px-3 py-2 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan font-mono"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-mono uppercase text-brand-gray mb-1">
                   Lead Status

@@ -30,6 +30,7 @@ import {
   deleteMasterRecordFromSupabase,
   fetchDealsFromSupabase,
   saveDealToSupabase,
+  deleteDealFromSupabase,
   fetchTeamMembersFromSupabase,
   saveTeamMemberToSupabase,
   fetchQuotasFromSupabase,
@@ -282,6 +283,16 @@ export function App() {
     broadcastLocalChange();
   };
 
+  const handleDeleteDeal = (dealId: string) => {
+    const dealToDelete = deals.find((d) => d.id === dealId);
+    const updated = StorageService.deleteDeal(dealId);
+    setDeals(updated);
+    if (dealToDelete) {
+      deleteDealFromSupabase(dealId, dealToDelete.email);
+    }
+    broadcastLocalChange();
+  };
+
   const handleSaveMasterRecord = (record: MasterRecord) => {
     const updated = StorageService.upsertMasterRecord(record);
     setMasterRecords(updated);
@@ -506,6 +517,7 @@ export function App() {
                   setDealToEdit(deal);
                   setIsInvoiceModalOpen(true);
                 }}
+                onDeleteDeal={handleDeleteDeal}
                 onMarkPaid={(deal) => {
                   setDealToMarkPaid(deal);
                 }}
@@ -567,6 +579,7 @@ export function App() {
           setDealToEdit(null);
         }}
         onSaveDeal={handleSaveDeal}
+        onDeleteDeal={handleDeleteDeal}
         dealToEdit={dealToEdit}
         teamMembers={teamMembers}
       />

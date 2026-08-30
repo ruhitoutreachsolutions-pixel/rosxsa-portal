@@ -49,10 +49,12 @@ export interface AuditLogEntry {
 export interface MasterRecord {
   id: string;
   email: string;
+  alternateEmails?: string[];
   domain: string;
   companyName?: string;
   contactName?: string;
   website?: string;
+  city?: string;
   country?: string;
   jobTitle?: string;
   phone?: string;
@@ -87,6 +89,7 @@ export interface Deal {
   companyName: string;
   contactName?: string;
   email: string;
+  alternateEmails?: string[];
   domain: string;
   valueGbp: number;
   stage: DealStage;

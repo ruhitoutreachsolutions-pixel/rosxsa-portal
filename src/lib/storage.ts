@@ -258,19 +258,37 @@ export class StorageService {
     return records;
   }
 
-  // Helper to safely find corresponding master record (respects generic vs corporate domains)
-  static findMatchingMasterRecordIndex(records: MasterRecord[], email: string, domain?: string): number {
+  // Helper to safely find corresponding master record (respects generic vs corporate domains & alt emails)
+  static findMatchingMasterRecordIndex(
+    records: MasterRecord[],
+    email: string,
+    domain?: string,
+    alternateEmails?: string[]
+  ): number {
     const cleanEmail = email.toLowerCase().trim();
     const cleanDomain = domain ? domain.toLowerCase().trim() : extractNormalizedDomain(cleanEmail);
     const isGeneric = isFreeEmailDomain(cleanDomain);
 
+    const allQueryEmails = [cleanEmail, ...(alternateEmails || []).map((e) => e.toLowerCase().trim())].filter(Boolean);
+
     return records.findIndex((m) => {
-      const mEmail = m.email.toLowerCase().trim();
-      if (mEmail === cleanEmail) return true;
-      // ONLY match by domain if it is a real company/business domain (NOT free webmails like gmail.com)
-      if (!isGeneric && cleanDomain && cleanDomain !== 'unknown') {
-        return m.domain && m.domain.toLowerCase().trim() === cleanDomain;
+      const allMasterEmails = [
+        m.email.toLowerCase().trim(),
+        ...(m.alternateEmails || []).map((e) => e.toLowerCase().trim()),
+      ].filter(Boolean);
+
+      // 1. Direct or Alternate Email match
+      if (allQueryEmails.some((qe) => allMasterEmails.includes(qe))) {
+        return true;
       }
+
+      // 2. Corporate Domain match (NOT free webmails)
+      if (!isGeneric && cleanDomain && cleanDomain !== 'unknown') {
+        if (m.domain && m.domain.toLowerCase().trim() === cleanDomain) {
+          return true;
+        }
+      }
+
       return false;
     });
   }
@@ -292,7 +310,7 @@ export class StorageService {
     this.saveDeals(deals);
 
     // Auto-sync or create Master Record
-    const masterIndex = this.findMatchingMasterRecordIndex(masterRecords, cleanEmail, cleanDomain);
+    const masterIndex = this.findMatchingMasterRecordIndex(masterRecords, cleanEmail, cleanDomain, deal.alternateEmails);
     const stageStatus = deal.stage === 'closed_won'
       ? 'paid_client'
       : deal.stage === 'closed_lost'
@@ -339,6 +357,13 @@ export class StorageService {
 
     this.saveMasterRecords(masterRecords);
     return { deals, masterRecords };
+  }
+
+  // Delete Deal
+  static deleteDeal(dealId: string): Deal[] {
+    const deals = this.getDeals().filter((d) => d.id !== dealId);
+    this.saveDeals(deals);
+    return deals;
   }
 
   // Mark Deal as Paid

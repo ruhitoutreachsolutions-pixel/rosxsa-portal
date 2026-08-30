@@ -14,6 +14,7 @@ import {
   CreditCard,
   Clock,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { Deal, DealStage, TeamMember } from '../../types';
 import { formatGbp, checkInvoiceAging } from '../../lib/currency';
@@ -24,6 +25,7 @@ interface DealPipelineProps {
   teamMembers: TeamMember[];
   onOpenNewDeal: () => void;
   onEditDeal: (deal: Deal) => void;
+  onDeleteDeal?: (dealId: string) => void;
   onMarkPaid: (deal: Deal) => void;
   onUpdateDealStage?: (dealId: string, newStage: DealStage) => void;
 }
@@ -48,6 +50,7 @@ export const DealPipeline: React.FC<DealPipelineProps> = ({
   teamMembers,
   onOpenNewDeal,
   onEditDeal,
+  onDeleteDeal,
   onMarkPaid,
   onUpdateDealStage,
 }) => {
@@ -442,12 +445,25 @@ export const DealPipeline: React.FC<DealPipelineProps> = ({
 
                             {/* Actions */}
                             <div className="pt-1.5 flex items-center justify-between gap-1 border-t border-white/5">
-                              <button
-                                onClick={() => onEditDeal(deal)}
-                                className="text-[11px] text-brand-gray hover:text-brand-white transition-colors whitespace-nowrap"
-                              >
-                                Edit
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => onEditDeal(deal)}
+                                  className="text-[11px] text-brand-gray hover:text-brand-white transition-colors whitespace-nowrap"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete the deal for "${deal.companyName}" (${deal.email})?`)) {
+                                      onDeleteDeal && onDeleteDeal(deal.id);
+                                    }
+                                  }}
+                                  className="text-[11px] text-red-400/70 hover:text-red-400 transition-colors whitespace-nowrap p-0.5"
+                                  title="Delete Deal"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
 
                               {deal.stage !== 'closed_won' && (
                                 <div className="flex items-center gap-1.5">
@@ -587,6 +603,17 @@ export const DealPipeline: React.FC<DealPipelineProps> = ({
                           </button>
                         </>
                       )}
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Are you sure you want to delete deal for "${deal.companyName}" (${deal.email})?`)) {
+                            onDeleteDeal && onDeleteDeal(deal.id);
+                          }
+                        }}
+                        className="px-2 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 text-xs font-semibold whitespace-nowrap inline-flex items-center"
+                        title="Delete Deal"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </td>
                   </tr>
                 );

@@ -132,6 +132,13 @@ export function scanCampaignList(
   masterRecords.forEach(rec => {
     const emailKey = rec.email.toLowerCase().trim();
     masterEmailMap.set(emailKey, rec);
+    if (rec.alternateEmails && Array.isArray(rec.alternateEmails)) {
+      rec.alternateEmails.forEach((alt) => {
+        if (alt && alt.trim()) {
+          masterEmailMap.set(alt.toLowerCase().trim(), rec);
+        }
+      });
+    }
 
     if (rec.domain && !isFreeEmailDomain(rec.domain)) {
       const domKey = rec.domain.toLowerCase().trim();
@@ -150,6 +157,13 @@ export function scanCampaignList(
     if (deal.stage !== 'closed_lost') {
       const emailKey = deal.email.toLowerCase().trim();
       dealEmailMap.set(emailKey, deal);
+      if (deal.alternateEmails && Array.isArray(deal.alternateEmails)) {
+        deal.alternateEmails.forEach((alt) => {
+          if (alt && alt.trim()) {
+            dealEmailMap.set(alt.toLowerCase().trim(), deal);
+          }
+        });
+      }
 
       if (deal.domain && !isFreeEmailDomain(deal.domain)) {
         const domKey = deal.domain.toLowerCase().trim();
@@ -219,24 +233,23 @@ export function scanCampaignList(
       isFlagged = true;
       stats.duplicates++;
     } else {
-      // 2. CHECK ACTIVE SALES PIPELINE & INVOICES (HIGHEST PRIORITY PROTECTION)
+      // 2. CHECK ACTIVE SALES OPPORTUNITIES
       const directDeal = dealEmailMap.get(normalizedEmail);
       const domainDeals = !isFreeMail && domain ? dealDomainMap.get(domain) : undefined;
 
       if (directDeal) {
-        itemStatus = 'sales_conflict';
-        ownerRep = directDeal.salesRep;
         matchedRecord = directDeal;
+        ownerRep = directDeal.salesRep;
+        itemStatus = 'sales_conflict';
         isFlagged = true;
         stats.salesConflicts++;
         const valStr = directDeal.valueGbp ? ` (£${directDeal.valueGbp.toLocaleString()})` : '';
-        const stageStr = directDeal.stage.replace('_', ' ').toUpperCase();
-        reason = `CRITICAL COLLISION: Active deal in ${stageStr}${valStr} owned by Sales Rep ${directDeal.salesRep}`;
+        reason = `SALES CONFLICT: Deal "${directDeal.title}" is in stage ${directDeal.stage} with Closer ${directDeal.salesRep}${valStr}`;
       } else if (domainDeals && domainDeals.length > 0) {
         const topDeal = domainDeals[0];
-        itemStatus = 'sales_conflict';
-        ownerRep = topDeal.salesRep;
         matchedRecord = topDeal;
+        ownerRep = topDeal.salesRep;
+        itemStatus = 'sales_conflict';
         isFlagged = true;
         stats.salesConflicts++;
         const valStr = topDeal.valueGbp ? ` (£${topDeal.valueGbp.toLocaleString()})` : '';
@@ -295,6 +308,34 @@ export function scanCampaignList(
             itemStatus = 'sales_conflict';
             reason = `DOMAIN COLLISION: Company @${domain} linked to active deal with ${conflict.salesRep || 'Sales'}`;
             stats.salesConflicts++;
+          }
+        } else if (companyName && companyName.trim().length >= 3) {
+          // 4. CHECK COMPANY NAME COLLISION
+          const companyConflict = masterRecords.find(
+            (r) => r.companyName && areCompanyNamesSimilar(companyName, r.companyName)
+          );
+          if (companyConflict) {
+            matchedRecord = companyConflict;
+            ownerRep = companyConflict.salesRep || companyConflict.leadGenRep;
+            isFlagged = true;
+
+            if (companyConflict.status === 'dnc') {
+              itemStatus = 'dnc_block';
+              reason = `BLOCKED (DNC): Company "${companyConflict.companyName}" is marked as DNC`;
+              stats.dncBlocked++;
+            } else if (companyConflict.status === 'paid_client') {
+              itemStatus = 'sales_conflict';
+              reason = `BLOCKED: Company "${companyConflict.companyName}" is an active Paid Client`;
+              stats.salesConflicts++;
+            } else if (companyConflict.status === 'interested' || companyConflict.status === 'in_conversation') {
+              itemStatus = 'interested_conflict';
+              reason = `COMPANY MATCH: Company "${companyConflict.companyName}" is active with ${companyConflict.leadGenRep || 'Lead Team'}`;
+              stats.interestedConflicts++;
+            } else {
+              itemStatus = 'sales_conflict';
+              reason = `COMPANY MATCH: Company "${companyConflict.companyName}" is in pipeline with ${companyConflict.salesRep || 'Sales'}`;
+              stats.salesConflicts++;
+            }
           }
         }
       }
