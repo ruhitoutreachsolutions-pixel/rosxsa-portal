@@ -56,23 +56,10 @@ export const INITIAL_TEAM_MEMBERS: TeamMember[] = [
 export const INITIAL_QUOTAS: MonthlyQuotas = {
   month: new Date().getMonth() + 1,
   year: new Date().getFullYear(),
-  companyTargetGbp: 25000,
-  salesTargets: [
-    { memberId: 'sales-1', memberName: 'Farzan', targetGbp: 5000 },
-    { memberId: 'sales-2', memberName: 'Abrar', targetGbp: 5000 },
-    { memberId: 'sales-3', memberName: 'Sagar', targetGbp: 5000 },
-    { memberId: 'sales-4', memberName: 'Anis', targetGbp: 5000 },
-    { memberId: 'sales-5', memberName: 'Shipu', targetGbp: 5000 },
-  ],
-  leadGenTargets: [
-    { memberId: 'lead-1', memberName: 'Ruhit', targetMeetings: 16 },
-    { memberId: 'lead-2', memberName: 'Nayeem', targetMeetings: 14 },
-    { memberId: 'lead-3', memberName: 'Tushar', targetMeetings: 14 },
-    { memberId: 'lead-4', memberName: 'Rafiq', targetMeetings: 12 },
-    { memberId: 'lead-5', memberName: 'Arshad', targetMeetings: 12 },
-    { memberId: 'lead-6', memberName: 'Azraf', targetMeetings: 10 },
-    { memberId: 'lead-7', memberName: 'Shahin', targetMeetings: 10 },
-  ],
+  companyTargetGbp: 0,
+  salesTargets: [],
+  leadGenTargets: [],
+  holidays: [],
 };
 
 const getPastDateString = (daysAgo: number) => {

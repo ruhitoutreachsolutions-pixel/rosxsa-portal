@@ -405,7 +405,10 @@ export async function fetchQuotasFromSupabase(): Promise<MonthlyQuotas | null> {
     return {
       month: data.month,
       year: data.year,
-      companyTargetGbp: parseFloat(data.company_target_gbp) || 25000,
+      companyTargetGbp:
+        data.company_target_gbp !== undefined && data.company_target_gbp !== null && !isNaN(Number(data.company_target_gbp))
+          ? Number(data.company_target_gbp)
+          : 0,
       salesTargets: data.sales_targets || [],
       leadGenTargets: data.lead_gen_targets || [],
       holidays: data.holidays || [],
