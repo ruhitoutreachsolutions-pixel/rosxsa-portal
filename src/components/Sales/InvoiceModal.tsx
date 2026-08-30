@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   X,
+  Check,
   PoundSterling,
   Building,
   User,
@@ -14,7 +15,7 @@ import {
   CreditCard,
   Sparkles,
 } from 'lucide-react';
-import { Deal, DealStage, TeamMember } from '../../types';
+import { Deal, DealStage, TeamMember, MeetingCountType } from '../../types';
 import { extractNormalizedDomain } from '../../lib/collisionEngine';
 
 interface InvoiceModalProps {
@@ -59,6 +60,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [leadGenRep, setLeadGenRep] = useState(leadGenReps[0]?.name || 'Ruhit');
   const [notes, setNotes] = useState('');
   const [lostReason, setLostReason] = useState('Pricing / Budget');
+  const [meetingCountType, setMeetingCountType] = useState<MeetingCountType>('yes');
 
   useEffect(() => {
     if (dealToEdit) {
@@ -79,6 +81,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setLeadGenRep(dealToEdit.leadGenRep || leadGenReps[0]?.name || 'Ruhit');
       setNotes(dealToEdit.notes || '');
       setLostReason('Pricing / Budget');
+      setMeetingCountType(dealToEdit.meetingCountType || 'yes');
     } else {
       setTitle('');
       setCompanyName('');
@@ -97,6 +100,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setLeadGenRep(leadGenReps[0]?.name || 'Ruhit');
       setNotes('');
       setLostReason('Pricing / Budget');
+      setMeetingCountType('yes');
     }
   }, [dealToEdit]);
 
@@ -126,6 +130,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       invoiceNumber: (stage === 'invoice_sent' || stage === 'payment_pending' || stage === 'closed_won') ? invoiceNumber : undefined,
       paidDate: stage === 'closed_won' ? paidDate : undefined,
       meetingCompleted: true,
+      meetingCountType,
       followUpDays: followUpDays || 7,
       salesRep,
       leadGenRep,
@@ -469,6 +474,56 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          {/* Meeting Quota Count Attribution (Meeting Yes / Meeting No / Pending) */}
+          <div className="p-3.5 rounded-xl bg-brand-midnight/40 border border-brand-midnight space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-brand-white">
+                Lead Gen Meeting Quota Count
+              </label>
+              <span className="text-[11px] text-brand-gray">
+                Attribution to <strong className="text-brand-cyan">{leadGenRep}</strong>
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setMeetingCountType('yes')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                  meetingCountType === 'yes'
+                    ? 'bg-brand-green/20 text-brand-green border-brand-green shadow-green-glow'
+                    : 'bg-brand-black text-brand-gray border-white/10 hover:text-white'
+                }`}
+              >
+                <Check className="w-3.5 h-3.5 stroke-[3] shrink-0" />
+                <span>Meeting Yes</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMeetingCountType('no')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                  meetingCountType === 'no'
+                    ? 'bg-brand-midnight text-brand-white border-white/30'
+                    : 'bg-brand-black text-brand-gray border-white/10 hover:text-white'
+                }`}
+              >
+                <X className="w-3.5 h-3.5 shrink-0" />
+                <span>Meeting No (Done Only)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMeetingCountType('pending')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                  meetingCountType === 'pending'
+                    ? 'bg-yellow-400/20 text-yellow-400 border-yellow-400/50 shadow-sm'
+                    : 'bg-brand-black text-brand-gray border-white/10 hover:text-white'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5 shrink-0" />
+                <span>Pending Review</span>
+              </button>
             </div>
           </div>
 

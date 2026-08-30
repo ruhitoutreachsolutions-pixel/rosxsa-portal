@@ -315,7 +315,7 @@ export class StorageService {
         leadGenRep: deal.leadGenRep || existing.leadGenRep,
         status: shouldUpdateStatus ? stageStatus : existing.status,
         meetingCompleted: true,
-        meetingCountType: deal.stage === 'closed_won' || deal.stage === 'demo_sent' || deal.stage === 'invoice_sent' ? 'yes' : (existing.meetingCountType || 'yes'),
+        meetingCountType: deal.meetingCountType || (deal.stage === 'closed_won' || deal.stage === 'demo_sent' || deal.stage === 'invoice_sent' ? 'yes' : (existing.meetingCountType || 'yes')),
         updatedAt: new Date().toISOString(),
       };
     } else {
@@ -330,7 +330,7 @@ export class StorageService {
         salesRep: deal.salesRep,
         leadGenRep: deal.leadGenRep,
         meetingCompleted: true,
-        meetingCountType: deal.stage === 'closed_won' || deal.stage === 'demo_sent' || deal.stage === 'invoice_sent' ? 'yes' : 'yes',
+        meetingCountType: deal.meetingCountType || (deal.stage === 'closed_won' || deal.stage === 'demo_sent' || deal.stage === 'invoice_sent' ? 'yes' : 'yes'),
         notes: deal.notes || `Added via Sales Opportunity (${deal.stage})`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

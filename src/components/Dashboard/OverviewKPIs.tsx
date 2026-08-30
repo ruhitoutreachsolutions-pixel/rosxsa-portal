@@ -97,6 +97,16 @@ export const OverviewKPIs: React.FC<OverviewKPIsProps> = ({ deals, masterRecords
   deals.filter((d) => d.stage === 'closed_won' || (d.meetingCompleted && d.meetingCountType === 'yes')).forEach((d) => countYesEmails.add(d.email.toLowerCase().trim()));
   const totalMeetingCount = countYesEmails.size + upcomingScheduled;
 
+  // Total Pending Review
+  const isPendingRecord = (r: MasterRecord) =>
+    r.meetingCountType === 'pending' ||
+    deals.some((d) => d.email.toLowerCase().trim() === r.email.toLowerCase().trim() && d.meetingCountType === 'pending');
+
+  const pendingEmails = new Set<string>();
+  masterRecords.filter(isPendingRecord).forEach((r) => pendingEmails.add(r.email.toLowerCase().trim()));
+  deals.filter((d) => d.meetingCountType === 'pending').forEach((d) => pendingEmails.add(d.email.toLowerCase().trim()));
+  const totalPendingReview = pendingEmails.size;
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* KPI 1: Closed Won Revenue */}
@@ -201,12 +211,20 @@ export const OverviewKPIs: React.FC<OverviewKPIsProps> = ({ deals, masterRecords
             </div>
           </div>
         </div>
-        <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-2 text-xs text-brand-gray font-mono flex-wrap">
+        <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-1.5 text-xs text-brand-gray font-mono flex-wrap">
           <span className="text-brand-cyan font-medium whitespace-nowrap shrink-0">{totalInterested} Interested</span>
           <span>·</span>
           <span className="text-yellow-400 font-medium whitespace-nowrap shrink-0">{totalScheduled} Scheduled</span>
           <span>·</span>
           <span className="text-brand-green font-semibold whitespace-nowrap shrink-0">{totalMeetingDone} Done</span>
+          {totalPendingReview > 0 && (
+            <>
+              <span>·</span>
+              <span className="text-yellow-400 font-bold bg-yellow-400/10 px-1.5 py-0.5 rounded border border-yellow-400/30 whitespace-nowrap shrink-0 animate-pulse">
+                {totalPendingReview} Pending
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>

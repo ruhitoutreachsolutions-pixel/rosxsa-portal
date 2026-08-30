@@ -91,6 +91,16 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
 
     const totalMeetingCount = countYesEmails.size + upcomingScheduled;
 
+    // Total Pending Review
+    const isPendingRecord = (r: MasterRecord) =>
+      r.meetingCountType === 'pending' ||
+      repDeals.some((d) => d.email.toLowerCase().trim() === r.email.toLowerCase().trim() && d.meetingCountType === 'pending');
+
+    const pendingEmails = new Set<string>();
+    repMasterRecords.filter(isPendingRecord).forEach((r) => pendingEmails.add(r.email.toLowerCase().trim()));
+    repDeals.filter((d) => d.meetingCountType === 'pending').forEach((d) => pendingEmails.add(d.email.toLowerCase().trim()));
+    const totalPending = pendingEmails.size;
+
     const wonDealsCount = repDeals.filter((d) => d.stage === 'closed_won').length;
     const wonRevenueGbp = repDeals
       .filter((d) => d.stage === 'closed_won')
@@ -107,6 +117,7 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
       totalMeetingsDone,
       meetingsScheduled,
       totalInterested,
+      totalPending,
       wonDealsCount,
       wonRevenueGbp,
       targetMeetings,
@@ -238,8 +249,13 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
                   </td>
 
                   {/* Total Meeting Done */}
-                  <td className="py-3 px-3 text-center font-mono text-brand-green font-semibold whitespace-nowrap">
-                    {stat.totalMeetingsDone}
+                  <td className="py-3 px-3 text-center font-mono whitespace-nowrap">
+                    <span className="text-brand-green font-semibold">{stat.totalMeetingsDone}</span>
+                    {stat.totalPending > 0 && (
+                      <span className="ml-1.5 px-1.5 py-0.5 text-[10px] rounded bg-yellow-400/20 text-yellow-300 border border-yellow-400/30 animate-pulse font-bold" title={`${stat.totalPending} meetings awaiting review`}>
+                        {stat.totalPending} pending
+                      </span>
+                    )}
                   </td>
 
                   {/* Progress Bar */}
