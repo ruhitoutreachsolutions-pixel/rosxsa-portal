@@ -223,6 +223,14 @@ export class StorageService {
     idbSet(STORAGE_KEYS.MASTER, records);
   }
 
+  static clearMasterRecords(): void {
+    this.masterRecordsCache = [];
+    try {
+      localStorage.setItem(STORAGE_KEYS.MASTER, JSON.stringify([]));
+    } catch (e) {}
+    idbSet(STORAGE_KEYS.MASTER, []);
+  }
+
   static getDeals(): Deal[] {
     return this.load<Deal[]>(STORAGE_KEYS.DEALS, INITIAL_DEALS);
   }

@@ -30,6 +30,7 @@ import {
   saveBulkMasterRecordsToSupabase,
   deleteMasterRecordFromSupabase,
   deleteBulkMasterRecordsFromSupabase,
+  clearAllMasterRecordsFromSupabase,
   fetchDealsFromSupabase,
   saveDealToSupabase,
   deleteDealFromSupabase,
@@ -350,6 +351,13 @@ export function App() {
     broadcastLocalChange();
   };
 
+  const handleClearAllMasterRecords = () => {
+    StorageService.clearMasterRecords();
+    setMasterRecords([]);
+    clearAllMasterRecordsFromSupabase();
+    broadcastLocalChange();
+  };
+
   const handleBulkAddMasterRecords = (newRecords: MasterRecord[]) => {
     const existingMap = new Map<string, MasterRecord>();
     // Index existing records
@@ -565,6 +573,7 @@ export function App() {
                 onUpdateRecord={handleSaveMasterRecord}
                 onDeleteRecord={handleDeleteMasterRecord}
                 onBulkDeleteRecords={handleBulkDeleteMasterRecords}
+                onClearAllRecords={handleClearAllMasterRecords}
                 onBulkAddRecords={handleBulkAddMasterRecords}
               />
             </div>

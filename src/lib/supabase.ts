@@ -135,14 +135,36 @@ export async function fetchMasterRecordsFromSupabase(): Promise<MasterRecord[] |
   if (!client) return null;
 
   try {
-    const { data, error } = await client
-      .from('master_records')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const allRows: any[] = [];
+    const PAGE_SIZE = 1000;
+    let from = 0;
+    let hasMore = true;
 
-    if (error || !data) return null;
+    while (hasMore) {
+      const { data, error } = await client
+        .from('master_records')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
 
-    return data.map((r: any): MasterRecord => ({
+      if (error) {
+        console.error('Error fetching master records page from Supabase:', error);
+        break;
+      }
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+      } else {
+        allRows.push(...data);
+        if (data.length < PAGE_SIZE) {
+          hasMore = false;
+        } else {
+          from += PAGE_SIZE;
+        }
+      }
+    }
+
+    return allRows.map((r: any): MasterRecord => ({
       id: r.id,
       email: r.email,
       domain: r.domain,
@@ -321,6 +343,27 @@ export async function deleteBulkMasterRecordsFromSupabase(
     return true;
   } catch (e) {
     console.error('Failed to bulk delete master records from Supabase:', e);
+    return false;
+  }
+}
+
+export async function clearAllMasterRecordsFromSupabase(): Promise<boolean> {
+  const client = getSupabase();
+  if (!client) return false;
+
+  try {
+    const { error } = await client
+      .from('master_records')
+      .delete()
+      .neq('email', '___never_match_placeholder_key___');
+
+    if (error) {
+      console.warn('Supabase clear error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('Failed to clear all master records from Supabase:', e);
     return false;
   }
 }

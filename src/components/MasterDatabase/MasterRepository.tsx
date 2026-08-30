@@ -46,6 +46,7 @@ interface MasterRepositoryProps {
   onUpdateRecord: (record: MasterRecord) => void;
   onDeleteRecord: (id: string) => void;
   onBulkDeleteRecords?: (ids: string[]) => void;
+  onClearAllRecords?: () => void;
   onBulkAddRecords: (records: MasterRecord[]) => void;
 }
 
@@ -57,11 +58,13 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
   onUpdateRecord,
   onDeleteRecord,
   onBulkDeleteRecords,
+  onClearAllRecords,
   onBulkAddRecords,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [isConfirmWipeAllOpen, setIsConfirmWipeAllOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MasterRecord | null>(null);
   const [viewHistoryRecord, setViewHistoryRecord] = useState<MasterRecord | null>(null);
   const [showColFilters, setShowColFilters] = useState(true);
@@ -224,6 +227,14 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
     }
     setSelectedIds(new Set());
     setIsConfirmBulkDeleteOpen(false);
+  };
+
+  const handleExecuteWipeAll = () => {
+    if (onClearAllRecords) {
+      onClearAllRecords();
+    }
+    setSelectedIds(new Set());
+    setIsConfirmWipeAllOpen(false);
   };
 
   const handleBulkStatusChange = (newStatus: LeadStatus) => {
@@ -415,6 +426,17 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
 
         {/* Top Buttons */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          {isAdmin && records.length > 0 && (
+            <button
+              onClick={() => setIsConfirmWipeAllOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-colors whitespace-nowrap shrink-0"
+              title="Completely wipe all master leads"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Wipe All Leads</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsBulkModalOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-black border border-white/10 hover:border-brand-cyan/40 text-brand-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0"
@@ -1582,6 +1604,51 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Yes, Delete {selectedIds.size.toLocaleString()} Leads</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wipe All Database Confirmation Dialog Modal */}
+      {isConfirmWipeAllOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-brand-navy border border-red-500/60 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-up p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-red-600/20 text-red-400 border border-red-500/50 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-brand-white">Wipe All Master Leads?</h3>
+                <p className="text-xs text-brand-gray">Completely clean the entire database</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-500/30 text-xs text-red-200 space-y-2">
+              <p>
+                ⚠️ <strong>Warning:</strong> You are about to permanently delete all{' '}
+                <strong className="text-white underline font-bold">{records.length.toLocaleString()} leads</strong> from the Master Database, local storage, and Supabase Cloud DB.
+              </p>
+              <p className="text-[11px] text-gray-300">
+                This will reset the Master Repository to 0 records so you can start fresh or re-import a clean list.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsConfirmWipeAllOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-brand-gray hover:text-white hover:bg-brand-midnight transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteWipeAll}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-lg active:scale-95 transition-all flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Yes, Wipe All {records.length.toLocaleString()} Leads</span>
               </button>
             </div>
           </div>
