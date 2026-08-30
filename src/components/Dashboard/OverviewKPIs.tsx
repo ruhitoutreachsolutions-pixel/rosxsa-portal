@@ -35,11 +35,26 @@ export const OverviewKPIs: React.FC<OverviewKPIsProps> = ({ deals, masterRecords
   const overdueGbp = overdueDeals.reduce((sum, d) => sum + (d.valueGbp || 0), 0);
 
   // 4. Meetings & Leads Calculations
-  const totalInterested = masterRecords.filter((r) => r.status === 'interested').length;
+  // Total Interested: All leads that expressed interest / entered pipeline
+  const isInterestedRecord = (r: MasterRecord) =>
+    r.status === 'interested' ||
+    r.status === 'meeting_scheduled' ||
+    r.status === 'meeting_done' ||
+    r.status === 'in_conversation' ||
+    r.status === 'demo_sent' ||
+    r.status === 'invoice_sent' ||
+    r.status === 'paid_client' ||
+    (r.status === 'dnc' && (r.meetingCompleted || r.notes?.includes('DEAL LOST') || r.auditHistory?.some((a) => a.action?.includes('Deal Lost'))));
 
-  const totalScheduled =
-    masterRecords.filter((r) => r.status === 'meeting_scheduled').length +
-    deals.filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted).length;
+  const interestedEmails = new Set<string>();
+  masterRecords.filter(isInterestedRecord).forEach((r) => interestedEmails.add(r.email.toLowerCase().trim()));
+  deals.forEach((d) => interestedEmails.add(d.email.toLowerCase().trim()));
+  const totalInterested = interestedEmails.size;
+
+  const scheduledEmails = new Set<string>();
+  masterRecords.filter((r) => r.status === 'meeting_scheduled').forEach((r) => scheduledEmails.add(r.email.toLowerCase().trim()));
+  deals.filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted).forEach((d) => scheduledEmails.add(d.email.toLowerCase().trim()));
+  const totalScheduled = scheduledEmails.size;
 
   // 1. All Completed Meetings (Meeting Done, In Conversation, Paid Client, Pipeline, and Sales Deal Lost DNC)
   const isMeetingDoneRecord = (r: MasterRecord) =>

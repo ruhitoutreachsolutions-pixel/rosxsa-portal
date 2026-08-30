@@ -27,12 +27,26 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
   const repStats = leadGenReps.map((rep) => {
     const repMasterRecords = masterRecords.filter((r) => r.leadGenRep === rep.name);
     const repDeals = deals.filter((d) => d.leadGenRep === rep.name);
+    // Total Interested: All leads that expressed interest / entered pipeline
+    const isInterestedLead = (r: MasterRecord) =>
+      r.status === 'interested' ||
+      r.status === 'meeting_scheduled' ||
+      r.status === 'meeting_done' ||
+      r.status === 'in_conversation' ||
+      r.status === 'demo_sent' ||
+      r.status === 'invoice_sent' ||
+      r.status === 'paid_client' ||
+      (r.status === 'dnc' && (r.meetingCompleted || r.notes?.includes('DEAL LOST') || r.auditHistory?.some((a) => a.action?.includes('Deal Lost'))));
 
-    const totalInterested = repMasterRecords.filter((r) => r.status === 'interested').length;
+    const interestedEmails = new Set<string>();
+    repMasterRecords.filter(isInterestedLead).forEach((r) => interestedEmails.add(r.email.toLowerCase().trim()));
+    repDeals.forEach((d) => interestedEmails.add(d.email.toLowerCase().trim()));
+    const totalInterested = interestedEmails.size;
 
-    const meetingsScheduled =
-      repMasterRecords.filter((r) => r.status === 'meeting_scheduled').length +
-      repDeals.filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted).length;
+    const scheduledEmails = new Set<string>();
+    repMasterRecords.filter((r) => r.status === 'meeting_scheduled').forEach((r) => scheduledEmails.add(r.email.toLowerCase().trim()));
+    repDeals.filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted).forEach((d) => scheduledEmails.add(d.email.toLowerCase().trim()));
+    const meetingsScheduled = scheduledEmails.size;
 
     // 1. All Completed Meetings (Meeting Done, In Conversation, Paid Client, Pipeline, and Sales Deal Lost DNC)
     const isMeetingDoneRecord = (r: MasterRecord) =>
