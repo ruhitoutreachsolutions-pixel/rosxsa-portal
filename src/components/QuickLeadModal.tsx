@@ -276,6 +276,7 @@ export const QuickLeadModal: React.FC<QuickLeadModalProps> = ({
                 onChange={(e) => setLeadGenRep(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-brand-black border border-brand-midnight text-brand-white text-sm focus:outline-none focus:border-brand-cyan"
               >
+                <option value="None">None (Unassigned / General)</option>
                 {leadGenReps.map((rep) => (
                   <option key={rep.id} value={rep.name}>
                     {rep.name} (Lead Gen)

@@ -120,7 +120,15 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
       if (!matchCity && !matchCountry) return false;
     }
 
-    if (colFilters.leadGenRep !== 'all' && rec.leadGenRep !== colFilters.leadGenRep) return false;
+    if (colFilters.leadGenRep !== 'all') {
+      if (colFilters.leadGenRep === 'None') {
+        if (rec.leadGenRep && rec.leadGenRep !== 'None' && rec.leadGenRep !== 'Unassigned') {
+          return false;
+        }
+      } else if (rec.leadGenRep !== colFilters.leadGenRep) {
+        return false;
+      }
+    }
     if (colFilters.salesRep !== 'all' && rec.salesRep !== colFilters.salesRep) return false;
     if (colFilters.date && !rec.createdAt.includes(colFilters.date)) return false;
 
@@ -547,6 +555,7 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
                   className="w-full px-2 py-1 rounded-lg bg-brand-midnight border border-white/10 text-[11px] text-brand-white focus:outline-none focus:border-brand-cyan"
                 >
                   <option value="all">All Reps</option>
+                  <option value="None">None (Unassigned)</option>
                   {leadGenReps.map((r) => (
                     <option key={r.id} value={r.name}>
                       {r.name}
@@ -1060,12 +1069,13 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
                   Lead Gen Rep
                 </label>
                 <select
-                  value={editingRecord.leadGenRep || leadGenReps[0]?.name}
+                  value={editingRecord.leadGenRep || 'None'}
                   onChange={(e) =>
                     setEditingRecord({ ...editingRecord, leadGenRep: e.target.value })
                   }
                   className="w-full px-3 py-2 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan"
                 >
+                  <option value="None">None (Unassigned / General)</option>
                   {leadGenReps.map((rep) => (
                     <option key={rep.id} value={rep.name}>
                       {rep.name} (Lead Gen)

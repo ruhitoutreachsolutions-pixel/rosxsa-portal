@@ -30,7 +30,7 @@ export const BulkDncModal: React.FC<BulkDncModalProps> = ({
   const [rawText, setRawText] = useState('');
   const [targetStatus, setTargetStatus] = useState<LeadStatus>('dnc');
   const [dncReason, setDncReason] = useState<DncReason>('unsubscribed');
-  const [selectedRep, setSelectedRep] = useState(leadGenReps[0]?.name || 'Ruhit');
+  const [selectedRep, setSelectedRep] = useState('None');
   const [notes, setNotes] = useState('Bulk imported list');
 
   const handleProcess = (e: React.FormEvent) => {
@@ -128,6 +128,7 @@ export const BulkDncModal: React.FC<BulkDncModalProps> = ({
                 onChange={(e) => setSelectedRep(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-brand-cyan"
               >
+                <option value="None">None (Unassigned / General)</option>
                 {leadGenReps.map((rep) => (
                   <option key={rep.id} value={rep.name}>
                     {rep.name}
