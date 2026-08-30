@@ -446,16 +446,25 @@ export const DealPipeline: React.FC<DealPipelineProps> = ({
                                 onClick={() => onEditDeal(deal)}
                                 className="text-[11px] text-brand-gray hover:text-brand-white transition-colors whitespace-nowrap"
                               >
-                                Edit Details
+                                Edit
                               </button>
 
                               {deal.stage !== 'closed_won' && (
-                                <button
-                                  onClick={() => onMarkPaid(deal)}
-                                  className="px-2 py-0.5 rounded bg-brand-green/20 text-brand-green hover:bg-brand-green hover:text-brand-black text-[10px] font-bold transition-all whitespace-nowrap"
-                                >
-                                  Mark Paid
-                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => onUpdateDealStage && onUpdateDealStage(deal.id, 'closed_lost')}
+                                    className="px-2 py-0.5 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-[10px] font-semibold transition-all whitespace-nowrap border border-red-500/30"
+                                    title="Mark Deal as Lost and Automatically Move Lead to DNC"
+                                  >
+                                    Lost (DNC)
+                                  </button>
+                                  <button
+                                    onClick={() => onMarkPaid(deal)}
+                                    className="px-2 py-0.5 rounded bg-brand-green/20 text-brand-green hover:bg-brand-green hover:text-brand-black text-[10px] font-bold transition-all whitespace-nowrap"
+                                  >
+                                    Mark Paid
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -511,7 +520,7 @@ export const DealPipeline: React.FC<DealPipelineProps> = ({
                         <option value="invoice_sent">3. Invoice & Agreement Sent</option>
                         <option value="payment_pending">4. Payment Pending</option>
                         <option value="closed_won">5. Paid & Closed Won</option>
-                        <option value="closed_lost">Closed Lost</option>
+                        <option value="closed_lost">❌ 6. Deal Lost (Move to DNC)</option>
                       </select>
                     </td>
                     <td className="py-3 px-3.5 font-mono whitespace-nowrap">
@@ -546,24 +555,37 @@ export const DealPipeline: React.FC<DealPipelineProps> = ({
                         <span className="text-brand-green font-mono font-semibold text-xs">
                           ✓ Paid in Full
                         </span>
+                      ) : deal.stage === 'closed_lost' ? (
+                        <span className="text-red-400 font-mono font-semibold text-xs">
+                          ❌ Deal Lost (DNC)
+                        </span>
                       ) : (
                         <span className="text-brand-gray font-mono text-xs">—</span>
                       )}
                     </td>
-                    <td className="py-3 px-3.5 text-right space-x-2 whitespace-nowrap">
+                    <td className="py-3 px-3.5 text-right space-x-1.5 whitespace-nowrap">
                       <button
                         onClick={() => onEditDeal(deal)}
                         className="px-2.5 py-1 rounded-lg bg-brand-black border border-white/10 text-brand-white hover:border-brand-cyan text-xs font-semibold whitespace-nowrap"
                       >
                         Edit
                       </button>
-                      {deal.stage !== 'closed_won' && (
-                        <button
-                          onClick={() => onMarkPaid(deal)}
-                          className="px-2.5 py-1 rounded-lg bg-brand-green text-brand-black font-bold text-xs hover:brightness-110 whitespace-nowrap"
-                        >
-                          Mark Paid
-                        </button>
+                      {deal.stage !== 'closed_won' && deal.stage !== 'closed_lost' && (
+                        <>
+                          <button
+                            onClick={() => onUpdateDealStage && onUpdateDealStage(deal.id, 'closed_lost')}
+                            className="px-2 py-1 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-xs font-semibold whitespace-nowrap border border-red-500/30"
+                            title="Mark Deal as Lost and Move Lead to DNC"
+                          >
+                            Lost (DNC)
+                          </button>
+                          <button
+                            onClick={() => onMarkPaid(deal)}
+                            className="px-2.5 py-1 rounded-lg bg-brand-green text-brand-black font-bold text-xs hover:brightness-110 whitespace-nowrap"
+                          >
+                            Mark Paid
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>

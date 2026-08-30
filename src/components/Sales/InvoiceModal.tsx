@@ -58,6 +58,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [salesRep, setSalesRep] = useState(salesReps[0]?.name || 'Farzan');
   const [leadGenRep, setLeadGenRep] = useState(leadGenReps[0]?.name || 'Ruhit');
   const [notes, setNotes] = useState('');
+  const [lostReason, setLostReason] = useState('Pricing / Budget');
 
   useEffect(() => {
     if (dealToEdit) {
@@ -77,6 +78,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setSalesRep(dealToEdit.salesRep);
       setLeadGenRep(dealToEdit.leadGenRep || leadGenReps[0]?.name || 'Ruhit');
       setNotes(dealToEdit.notes || '');
+      setLostReason('Pricing / Budget');
     } else {
       setTitle('');
       setCompanyName('');
@@ -94,6 +96,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setSalesRep(salesReps[0]?.name || 'Farzan');
       setLeadGenRep(leadGenReps[0]?.name || 'Ruhit');
       setNotes('');
+      setLostReason('Pricing / Budget');
     }
   }, [dealToEdit]);
 
@@ -103,6 +106,9 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     const domain = extractNormalizedDomain(email);
     const parsedVal = hasPricingGiven ? parseFloat(valueGbp) || 0 : 0;
+    const finalNotes = stage === 'closed_lost'
+      ? `${notes.trim() ? notes.trim() + ' | ' : ''}Lost Reason: ${lostReason}`
+      : notes.trim() || undefined;
 
     const deal: Deal = {
       id: dealToEdit ? dealToEdit.id : `deal-${Date.now()}`,
@@ -123,7 +129,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       followUpDays: followUpDays || 7,
       salesRep,
       leadGenRep,
-      notes: notes.trim() || undefined,
+      notes: finalNotes,
       createdAt: dealToEdit ? dealToEdit.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -175,10 +181,37 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
               <option value="invoice_sent">3. Invoice & Agreement Sent</option>
               <option value="payment_pending">4. Payment Pending (Awaiting Transfer)</option>
               <option value="closed_won">5. Paid & Closed Won (Payment Confirmed)</option>
+              <option value="closed_lost">❌ 6. Deal Lost / Closed Lost (Auto-Upload to DNC)</option>
             </select>
           </div>
 
           {/* Stage-Specific Date & Pricing Controls */}
+          {stage === 'closed_lost' && (
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-red-400">
+                <AlertCircle className="w-4 h-4" />
+                <span>Deal Lost & Auto-DNC Protection</span>
+              </div>
+              <p className="text-xs text-gray-300">
+                Marking this deal as <strong>Closed Lost</strong> will automatically upload the lead to the <strong>Master Database as DNC (Do Not Contact)</strong> with the lost reason recorded, protecting your team from accidental outreach collisions.
+              </p>
+              <div>
+                <label className="block text-xs text-brand-gray mb-1">Reason for Lost Deal <span className="text-red-400">*</span></label>
+                <select
+                  value={lostReason}
+                  onChange={(e) => setLostReason(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-brand-black border border-brand-midnight text-xs text-brand-white focus:outline-none focus:border-red-400 font-medium"
+                >
+                  <option value="Pricing / Budget">Pricing too high / No budget</option>
+                  <option value="Went with Competitor">Went with competitor</option>
+                  <option value="No Response / Ghosted">No response / Ghosted after pitch</option>
+                  <option value="Timing / Not Ready">Bad timing / Project postponed</option>
+                  <option value="Not a Good Fit">Not a good fit / Unqualified</option>
+                  <option value="Other">Other / Hostile response</option>
+                </select>
+              </div>
+            </div>
+          )}
           {stage === 'discovery_pitch' && (
             <div className="p-4 rounded-xl bg-brand-navy border border-brand-cyan/20 space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-brand-cyan">
@@ -462,9 +495,13 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-brand-green text-brand-black font-bold text-xs hover:brightness-110 active:scale-95 transition-all shadow-green-glow"
+              className={`px-5 py-2.5 rounded-xl font-bold text-xs hover:brightness-110 active:scale-95 transition-all ${
+                stage === 'closed_lost'
+                  ? 'bg-red-500 text-white shadow-orange-glow'
+                  : 'bg-brand-green text-brand-black shadow-green-glow'
+              }`}
             >
-              Save Deal & Update Stage
+              {stage === 'closed_lost' ? '❌ Mark Deal as Lost & Move to DNC' : 'Save Deal & Update Stage'}
             </button>
           </div>
         </form>

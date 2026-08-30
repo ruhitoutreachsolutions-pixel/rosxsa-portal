@@ -340,6 +340,81 @@ export class StorageService {
     return { deals, masterRecords };
   }
 
+  // Mark Deal as Lost & Automatically upload to Master Database as DNC
+  static markDealAsLost(dealId: string, lostReason: string = 'Deal Lost', userNotes?: string, repName?: string): { deals: Deal[]; masterRecords: MasterRecord[] } {
+    const deals = this.getDeals();
+    const masterRecords = this.getMasterRecords();
+
+    const dealIndex = deals.findIndex((d) => d.id === dealId);
+    if (dealIndex >= 0) {
+      const deal = deals[dealIndex];
+      const updatedDeal: Deal = {
+        ...deal,
+        stage: 'closed_lost',
+        notes: userNotes ? `${deal.notes ? deal.notes + ' | ' : ''}Lost: ${lostReason} - ${userNotes}` : (deal.notes || `Deal Lost (${lostReason})`),
+        updatedAt: new Date().toISOString(),
+      };
+      deals[dealIndex] = updatedDeal;
+      this.saveDeals(deals);
+
+      // Look up corresponding Master Record or create DNC record
+      const cleanEmail = deal.email.toLowerCase().trim();
+      const cleanDomain = deal.domain.toLowerCase().trim();
+      const masterIndex = masterRecords.findIndex(
+        (m) => m.email.toLowerCase().trim() === cleanEmail || (cleanDomain !== 'unknown' && m.domain.toLowerCase().trim() === cleanDomain)
+      );
+
+      const dncNote = `❌ DEAL LOST: ${lostReason}${userNotes ? ' - ' + userNotes : ''} [Logged by ${repName || deal.salesRep} on ${new Date().toISOString().split('T')[0]}]`;
+
+      if (masterIndex >= 0) {
+        const rec = masterRecords[masterIndex];
+        const audit = rec.auditHistory || [];
+        masterRecords[masterIndex] = {
+          ...rec,
+          status: 'dnc',
+          dncReason: 'other',
+          notes: rec.notes ? `${rec.notes}\n${dncNote}` : dncNote,
+          updatedAt: new Date().toISOString(),
+          auditHistory: [
+            {
+              timestamp: new Date().toISOString(),
+              user: repName || deal.salesRep,
+              action: `Deal Lost -> Moved to DNC (${lostReason})`,
+            },
+            ...audit,
+          ],
+        };
+      } else {
+        // Create new Master Record as DNC
+        masterRecords.unshift({
+          id: `master-${Date.now()}`,
+          email: cleanEmail,
+          domain: cleanDomain || 'unknown',
+          companyName: deal.companyName,
+          contactName: deal.contactName,
+          status: 'dnc',
+          dncReason: 'other',
+          notes: dncNote,
+          leadGenRep: deal.leadGenRep,
+          salesRep: deal.salesRep,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          auditHistory: [
+            {
+              timestamp: new Date().toISOString(),
+              user: repName || deal.salesRep,
+              action: `Deal Lost -> Created as DNC (${lostReason})`,
+            },
+          ],
+        });
+      }
+
+      this.saveMasterRecords(masterRecords);
+    }
+
+    return { deals, masterRecords };
+  }
+
   // Upsert Master Record
   static upsertMasterRecord(record: MasterRecord): MasterRecord[] {
     const records = this.getMasterRecords();

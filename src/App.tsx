@@ -232,25 +232,51 @@ export function App() {
 
   // Save / Update Handlers
   const handleSaveDeal = (deal: Deal) => {
-    const updated = StorageService.upsertDeal(deal);
-    setDeals(updated);
-    saveDealToSupabase(deal);
+    if (deal.stage === 'closed_lost') {
+      const res = StorageService.markDealAsLost(deal.id, 'Closed Lost', deal.notes, currentUser.fullName);
+      setDeals(res.deals);
+      setMasterRecords(res.masterRecords);
+
+      const lostDeal = res.deals.find((d) => d.id === deal.id);
+      if (lostDeal) saveDealToSupabase(lostDeal);
+      const lostMaster = res.masterRecords.find(
+        (m) => lostDeal && (m.email.toLowerCase() === lostDeal.email.toLowerCase() || m.domain.toLowerCase() === lostDeal.domain.toLowerCase())
+      );
+      if (lostMaster) saveMasterRecordToSupabase(lostMaster);
+    } else {
+      const updated = StorageService.upsertDeal(deal);
+      setDeals(updated);
+      saveDealToSupabase(deal);
+    }
     broadcastLocalChange();
   };
 
   const handleUpdateDealStage = (dealId: string, newStage: DealStage) => {
-    const deal = deals.find((d) => d.id === dealId);
-    if (deal) {
-      const updatedDeal: Deal = {
-        ...deal,
-        stage: newStage,
-        updatedAt: new Date().toISOString(),
-      };
-      const updatedList = StorageService.upsertDeal(updatedDeal);
-      setDeals(updatedList);
-      saveDealToSupabase(updatedDeal);
-      broadcastLocalChange();
+    if (newStage === 'closed_lost') {
+      const res = StorageService.markDealAsLost(dealId, 'Closed Lost', 'Moved to Closed Lost via Pipeline', currentUser.fullName);
+      setDeals(res.deals);
+      setMasterRecords(res.masterRecords);
+
+      const lostDeal = res.deals.find((d) => d.id === dealId);
+      if (lostDeal) saveDealToSupabase(lostDeal);
+      const lostMaster = res.masterRecords.find(
+        (m) => lostDeal && (m.email.toLowerCase() === lostDeal.email.toLowerCase() || m.domain.toLowerCase() === lostDeal.domain.toLowerCase())
+      );
+      if (lostMaster) saveMasterRecordToSupabase(lostMaster);
+    } else {
+      const deal = deals.find((d) => d.id === dealId);
+      if (deal) {
+        const updatedDeal: Deal = {
+          ...deal,
+          stage: newStage,
+          updatedAt: new Date().toISOString(),
+        };
+        const updatedList = StorageService.upsertDeal(updatedDeal);
+        setDeals(updatedList);
+        saveDealToSupabase(updatedDeal);
+      }
     }
+    broadcastLocalChange();
   };
 
   const handleSaveMasterRecord = (record: MasterRecord) => {
