@@ -40,8 +40,18 @@ import {
   saveQuotasToSupabase,
   saveUserToSupabase,
 } from './lib/supabase';
-import { Deal, DealStage, MasterRecord, MonthlyQuotas, TeamMember, UserAccount, MeetingCountType } from './types';
+import {
+  Deal,
+  DealStage,
+  MasterRecord,
+  MonthlyQuotas,
+  TeamMember,
+  UserAccount,
+  MeetingCountType,
+  NotificationItem,
+} from './types';
 import { checkInvoiceAging } from './lib/currency';
+import { checkAndFireDesktopNotifications } from './lib/desktopNotifications';
 
 export function App() {
   // Authentication State
@@ -223,8 +233,8 @@ export function App() {
   }
 
   // Notifications & Overdue Calculations
-  const notifications = StorageService.getNotifications();
-  const unreadNotifications = notifications.filter((n) => {
+  const notifications: NotificationItem[] = StorageService.getNotifications();
+  const unreadNotifications = notifications.filter((n: NotificationItem) => {
     if (n.isRead) return false;
     if (currentUser.role === 'lead_gen' && n.type === 'invoice_overdue') return false;
     if (currentUser.role !== 'admin' && n.type === 'meeting_approval') return false;
@@ -236,6 +246,17 @@ export function App() {
       (d.stage === 'invoice_sent' || d.stage === 'payment_pending') &&
       checkInvoiceAging(d).isOverdue
   );
+
+  // Dispatch Native Desktop Notifications for Admin & Sales
+  useEffect(() => {
+    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'sales')) {
+      checkAndFireDesktopNotifications(
+        notifications,
+        currentUser.role === 'admin',
+        () => setIsNotificationsOpen(true)
+      );
+    }
+  }, [notifications, currentUser]);
 
   const salesReps = teamMembers.filter((m) => m.role === 'sales');
   const leadGenReps = teamMembers.filter((m) => m.role === 'lead_gen');
