@@ -9,6 +9,7 @@ import {
   MeetingCountType,
 } from '../types';
 import { checkInvoiceAging } from './currency';
+import { isFreeEmailDomain, extractNormalizedDomain } from './collisionEngine';
 
 const STORAGE_KEYS = {
   USERS: 'rosxsa_user_accounts',
@@ -270,21 +271,83 @@ export class StorageService {
     return records;
   }
 
-  // Upsert Deal
-  static upsertDeal(deal: Deal): Deal[] {
-    const deals = this.getDeals();
-    const index = deals.findIndex((d) => d.id === deal.id);
-    let updated: Deal[];
+  // Helper to safely find corresponding master record (respects generic vs corporate domains)
+  static findMatchingMasterRecordIndex(records: MasterRecord[], email: string, domain?: string): number {
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanDomain = domain ? domain.toLowerCase().trim() : extractNormalizedDomain(cleanEmail);
+    const isGeneric = isFreeEmailDomain(cleanDomain);
 
-    if (index >= 0) {
-      updated = [...deals];
-      updated[index] = { ...deal, updatedAt: new Date().toISOString() };
+    return records.findIndex((m) => {
+      const mEmail = m.email.toLowerCase().trim();
+      if (mEmail === cleanEmail) return true;
+      // ONLY match by domain if it is a real company/business domain (NOT free webmails like gmail.com)
+      if (!isGeneric && cleanDomain && cleanDomain !== 'unknown') {
+        return m.domain && m.domain.toLowerCase().trim() === cleanDomain;
+      }
+      return false;
+    });
+  }
+
+  // Upsert Deal (Automatically creates or syncs with Master Database)
+  static upsertDeal(deal: Deal): { deals: Deal[]; masterRecords: MasterRecord[] } {
+    const deals = this.getDeals();
+    const masterRecords = this.getMasterRecords();
+
+    const cleanEmail = deal.email.toLowerCase().trim();
+    const cleanDomain = deal.domain ? deal.domain.toLowerCase().trim() : extractNormalizedDomain(cleanEmail);
+
+    const dealIndex = deals.findIndex((d) => d.id === deal.id);
+    if (dealIndex >= 0) {
+      deals[dealIndex] = { ...deal, domain: cleanDomain, updatedAt: new Date().toISOString() };
     } else {
-      updated = [{ ...deal, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, ...deals];
+      deals.unshift({ ...deal, domain: cleanDomain, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    }
+    this.saveDeals(deals);
+
+    // Auto-sync or create Master Record
+    const masterIndex = this.findMatchingMasterRecordIndex(masterRecords, cleanEmail, cleanDomain);
+    const stageStatus = deal.stage === 'closed_won'
+      ? 'paid_client'
+      : deal.stage === 'closed_lost'
+      ? 'dnc'
+      : deal.stage === 'demo_sent'
+      ? 'demo_sent'
+      : deal.stage === 'invoice_sent'
+      ? 'invoice_sent'
+      : 'meeting_done';
+
+    if (masterIndex >= 0) {
+      const existing = masterRecords[masterIndex];
+      // Only update status if existing record isn't already a paid_client or dnc unless explicitly changed
+      const shouldUpdateStatus = existing.status !== 'paid_client' && existing.status !== 'dnc';
+      masterRecords[masterIndex] = {
+        ...existing,
+        companyName: deal.companyName || existing.companyName,
+        contactName: deal.contactName || existing.contactName,
+        salesRep: deal.salesRep || existing.salesRep,
+        leadGenRep: deal.leadGenRep || existing.leadGenRep,
+        status: shouldUpdateStatus ? stageStatus : existing.status,
+        updatedAt: new Date().toISOString(),
+      };
+    } else {
+      // Auto-upload new lead to Master Database so it immediately exists in the repository!
+      masterRecords.unshift({
+        id: `master-${Date.now()}`,
+        email: cleanEmail,
+        domain: cleanDomain || 'unknown',
+        companyName: deal.companyName,
+        contactName: deal.contactName,
+        status: stageStatus,
+        salesRep: deal.salesRep,
+        leadGenRep: deal.leadGenRep,
+        notes: deal.notes || `Added via Sales Opportunity (${deal.stage})`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
     }
 
-    this.saveDeals(updated);
-    return updated;
+    this.saveMasterRecords(masterRecords);
+    return { deals, masterRecords };
   }
 
   // Mark Deal as Paid
@@ -305,10 +368,9 @@ export class StorageService {
       deals[dealIndex] = updatedDeal;
       this.saveDeals(deals);
 
-      // Protect domain in master records
-      const existingMasterIndex = masterRecords.findIndex(
-        (m) => m.email.toLowerCase() === deal.email.toLowerCase() || (m.domain && m.domain.toLowerCase() === deal.domain.toLowerCase())
-      );
+      const cleanEmail = deal.email.toLowerCase().trim();
+      const cleanDomain = deal.domain ? deal.domain.toLowerCase().trim() : extractNormalizedDomain(cleanEmail);
+      const existingMasterIndex = this.findMatchingMasterRecordIndex(masterRecords, cleanEmail, cleanDomain);
 
       if (existingMasterIndex >= 0) {
         masterRecords[existingMasterIndex] = {
@@ -322,8 +384,8 @@ export class StorageService {
       } else {
         masterRecords.unshift({
           id: `master-${Date.now()}`,
-          email: deal.email,
-          domain: deal.domain,
+          email: cleanEmail,
+          domain: cleanDomain || 'unknown',
           companyName: deal.companyName,
           contactName: deal.contactName,
           status: 'paid_client',
@@ -357,12 +419,9 @@ export class StorageService {
       deals[dealIndex] = updatedDeal;
       this.saveDeals(deals);
 
-      // Look up corresponding Master Record or create DNC record
       const cleanEmail = deal.email.toLowerCase().trim();
-      const cleanDomain = deal.domain.toLowerCase().trim();
-      const masterIndex = masterRecords.findIndex(
-        (m) => m.email.toLowerCase().trim() === cleanEmail || (cleanDomain !== 'unknown' && m.domain.toLowerCase().trim() === cleanDomain)
-      );
+      const cleanDomain = deal.domain ? deal.domain.toLowerCase().trim() : extractNormalizedDomain(cleanEmail);
+      const masterIndex = this.findMatchingMasterRecordIndex(masterRecords, cleanEmail, cleanDomain);
 
       const dncNote = `❌ DEAL LOST: ${lostReason}${userNotes ? ' - ' + userNotes : ''} [Logged by ${repName || deal.salesRep} on ${new Date().toISOString().split('T')[0]}]`;
 

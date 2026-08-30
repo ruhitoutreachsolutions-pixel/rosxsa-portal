@@ -239,14 +239,16 @@ export function App() {
 
       const lostDeal = res.deals.find((d) => d.id === deal.id);
       if (lostDeal) saveDealToSupabase(lostDeal);
-      const lostMaster = res.masterRecords.find(
-        (m) => lostDeal && (m.email.toLowerCase() === lostDeal.email.toLowerCase() || m.domain.toLowerCase() === lostDeal.domain.toLowerCase())
-      );
+      const lostMaster = res.masterRecords.find((m) => m.email.toLowerCase().trim() === deal.email.toLowerCase().trim());
       if (lostMaster) saveMasterRecordToSupabase(lostMaster);
     } else {
-      const updated = StorageService.upsertDeal(deal);
-      setDeals(updated);
+      const res = StorageService.upsertDeal(deal);
+      setDeals(res.deals);
+      setMasterRecords(res.masterRecords);
+
       saveDealToSupabase(deal);
+      const matchingMaster = res.masterRecords.find((m) => m.email.toLowerCase().trim() === deal.email.toLowerCase().trim());
+      if (matchingMaster) saveMasterRecordToSupabase(matchingMaster);
     }
     broadcastLocalChange();
   };
@@ -259,9 +261,7 @@ export function App() {
 
       const lostDeal = res.deals.find((d) => d.id === dealId);
       if (lostDeal) saveDealToSupabase(lostDeal);
-      const lostMaster = res.masterRecords.find(
-        (m) => lostDeal && (m.email.toLowerCase() === lostDeal.email.toLowerCase() || m.domain.toLowerCase() === lostDeal.domain.toLowerCase())
-      );
+      const lostMaster = res.masterRecords.find((m) => lostDeal && m.email.toLowerCase().trim() === lostDeal.email.toLowerCase().trim());
       if (lostMaster) saveMasterRecordToSupabase(lostMaster);
     } else {
       const deal = deals.find((d) => d.id === dealId);
@@ -271,9 +271,12 @@ export function App() {
           stage: newStage,
           updatedAt: new Date().toISOString(),
         };
-        const updatedList = StorageService.upsertDeal(updatedDeal);
-        setDeals(updatedList);
+        const res = StorageService.upsertDeal(updatedDeal);
+        setDeals(res.deals);
+        setMasterRecords(res.masterRecords);
         saveDealToSupabase(updatedDeal);
+        const matchingMaster = res.masterRecords.find((m) => m.email.toLowerCase().trim() === updatedDeal.email.toLowerCase().trim());
+        if (matchingMaster) saveMasterRecordToSupabase(matchingMaster);
       }
     }
     broadcastLocalChange();
