@@ -24,9 +24,24 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
   leadGenReps,
   onSelectRep,
 }) => {
+  // Helper for case-insensitive, whitespace-tolerant rep matching
+  const isRepMatching = (recordRep?: string, teamRepName?: string, teamRepEmail?: string) => {
+    if (!recordRep || !teamRepName) return false;
+    const cleanRec = recordRep.trim().toLowerCase();
+    const cleanRep = teamRepName.trim().toLowerCase();
+    const cleanEmail = teamRepEmail?.trim().toLowerCase() || '';
+    return (
+      cleanRec === cleanRep ||
+      cleanRec === cleanEmail ||
+      cleanRec.startsWith(cleanRep) ||
+      cleanRep.startsWith(cleanRec)
+    );
+  };
+
   const repStats = leadGenReps.map((rep) => {
-    const repMasterRecords = masterRecords.filter((r) => r.leadGenRep === rep.name);
-    const repDeals = deals.filter((d) => d.leadGenRep === rep.name);
+    const repMasterRecords = masterRecords.filter((r) => isRepMatching(r.leadGenRep, rep.name, rep.email));
+    const repDeals = deals.filter((d) => isRepMatching(d.leadGenRep, rep.name, rep.email));
+
     // Total Interested: All leads that expressed interest / entered pipeline
     const isInterestedLead = (r: MasterRecord) =>
       r.status === 'interested' ||
@@ -59,9 +74,14 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
     const meetingsScheduled = scheduledEmails.size;
 
     // Upcoming scheduled meetings not yet completed
-    const upcomingScheduled =
-      repMasterRecords.filter((r) => r.status === 'meeting_scheduled' && !r.meetingCompleted).length +
-      repDeals.filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted).length;
+    const upcomingScheduledEmails = new Set<string>();
+    repMasterRecords
+      .filter((r) => r.status === 'meeting_scheduled' && !r.meetingCompleted)
+      .forEach((r) => upcomingScheduledEmails.add(r.email.toLowerCase().trim()));
+    repDeals
+      .filter((d) => d.stage === 'discovery_pitch' && !d.meetingCompleted)
+      .forEach((d) => upcomingScheduledEmails.add(d.email.toLowerCase().trim()));
+    const upcomingScheduled = upcomingScheduledEmails.size;
 
     // 1. All Completed Meetings (Meeting Done, In Conversation, Paid Client, Pipeline, and Sales Deal Lost DNC)
     const isMeetingDoneRecord = (r: MasterRecord) =>
@@ -87,7 +107,9 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
 
     const countYesEmails = new Set<string>();
     repMasterRecords.filter(isCountYesRecord).forEach((r) => countYesEmails.add(r.email.toLowerCase().trim()));
-    repDeals.filter((d) => d.stage === 'closed_won' || (d.meetingCompleted && d.meetingCountType === 'yes')).forEach((d) => countYesEmails.add(d.email.toLowerCase().trim()));
+    repDeals
+      .filter((d) => d.stage === 'closed_won' || (d.meetingCompleted && d.meetingCountType === 'yes'))
+      .forEach((d) => countYesEmails.add(d.email.toLowerCase().trim()));
 
     const totalMeetingCount = countYesEmails.size + upcomingScheduled;
 
@@ -106,8 +128,10 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
       .filter((d) => d.stage === 'closed_won')
       .reduce((sum, d) => sum + (d.valueGbp || 0), 0);
 
-    const targetObj = quotas.leadGenTargets.find((t) => t.memberName === rep.name);
-    const targetMeetings = targetObj ? targetObj.targetMeetings : 12;
+    const targetObj = quotas.leadGenTargets.find(
+      (t) => isRepMatching(t.memberName, rep.name, rep.email)
+    );
+    const targetMeetings = targetObj && targetObj.targetMeetings !== undefined ? targetObj.targetMeetings : 12;
     const progressPct =
       targetMeetings > 0 ? Math.round((totalMeetingCount / targetMeetings) * 100) : 0;
 
@@ -125,7 +149,22 @@ export const LeadGenLeaderboard: React.FC<LeadGenLeaderboardProps> = ({
     };
   });
 
-  const sortedStats = [...repStats].sort((a, b) => b.totalMeetingCount - a.totalMeetingCount);
+  // Multi-tier sort: Meeting Count -> Meetings Done -> Scheduled -> Interested -> Name
+  const sortedStats = [...repStats].sort((a, b) => {
+    if (b.totalMeetingCount !== a.totalMeetingCount) {
+      return b.totalMeetingCount - a.totalMeetingCount;
+    }
+    if (b.totalMeetingsDone !== a.totalMeetingsDone) {
+      return b.totalMeetingsDone - a.totalMeetingsDone;
+    }
+    if (b.meetingsScheduled !== a.meetingsScheduled) {
+      return b.meetingsScheduled - a.meetingsScheduled;
+    }
+    if (b.totalInterested !== a.totalInterested) {
+      return b.totalInterested - a.totalInterested;
+    }
+    return a.rep.name.localeCompare(b.rep.name);
+  });
 
   return (
     <div className="p-6 rounded-2xl bg-brand-navy border border-brand-midnight shadow-card-dark space-y-4">

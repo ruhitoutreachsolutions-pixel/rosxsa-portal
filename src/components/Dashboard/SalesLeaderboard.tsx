@@ -23,8 +23,21 @@ export const SalesLeaderboard: React.FC<SalesLeaderboardProps> = ({
   salesReps,
   onSelectRep,
 }) => {
+  const isRepMatching = (recordRep?: string, teamRepName?: string, teamRepEmail?: string) => {
+    if (!recordRep || !teamRepName) return false;
+    const cleanRec = recordRep.trim().toLowerCase();
+    const cleanRep = teamRepName.trim().toLowerCase();
+    const cleanEmail = teamRepEmail?.trim().toLowerCase() || '';
+    return (
+      cleanRec === cleanRep ||
+      cleanRec === cleanEmail ||
+      cleanRec.startsWith(cleanRep) ||
+      cleanRep.startsWith(cleanRec)
+    );
+  };
+
   const repStats = salesReps.map((rep) => {
-    const repDeals = deals.filter((d) => d.salesRep === rep.name);
+    const repDeals = deals.filter((d) => isRepMatching(d.salesRep, rep.name, rep.email));
     const wonDeals = repDeals.filter((d) => d.stage === 'closed_won');
     const closedRevenueGbp = wonDeals.reduce((sum, d) => sum + (d.valueGbp || 0), 0);
 
@@ -36,8 +49,10 @@ export const SalesLeaderboard: React.FC<SalesLeaderboardProps> = ({
     );
     const pendingInvoicedGbp = pendingInvoices.reduce((sum, d) => sum + (d.valueGbp || 0), 0);
 
-    const targetObj = quotas.salesTargets.find((t) => t.memberName === rep.name);
-    const targetGbp = targetObj ? targetObj.targetGbp : 5000;
+    const targetObj = quotas.salesTargets.find(
+      (t) => isRepMatching(t.memberName, rep.name, rep.email)
+    );
+    const targetGbp = targetObj && targetObj.targetGbp !== undefined ? targetObj.targetGbp : 5000;
     const achievementPct =
       targetGbp > 0 ? Math.round((closedRevenueGbp / targetGbp) * 100) : 0;
 
@@ -53,7 +68,18 @@ export const SalesLeaderboard: React.FC<SalesLeaderboardProps> = ({
     };
   });
 
-  const sortedStats = [...repStats].sort((a, b) => b.closedRevenueGbp - a.closedRevenueGbp);
+  const sortedStats = [...repStats].sort((a, b) => {
+    if (b.closedRevenueGbp !== a.closedRevenueGbp) {
+      return b.closedRevenueGbp - a.closedRevenueGbp;
+    }
+    if (b.totalPipelineGbp !== a.totalPipelineGbp) {
+      return b.totalPipelineGbp - a.totalPipelineGbp;
+    }
+    if (b.wonCount !== a.wonCount) {
+      return b.wonCount - a.wonCount;
+    }
+    return a.rep.name.localeCompare(b.rep.name);
+  });
 
   return (
     <div className="p-6 rounded-2xl bg-brand-navy border border-brand-midnight shadow-card-dark space-y-4">
