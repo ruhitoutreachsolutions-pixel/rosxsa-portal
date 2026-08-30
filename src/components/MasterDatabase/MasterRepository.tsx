@@ -17,6 +17,8 @@ import {
   ThumbsUp,
   ShieldBan,
   MessageSquare,
+  Send,
+  FileText,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { MasterRecord, LeadStatus, TeamMember, UserAccount, MeetingCountType } from '../../types';
@@ -373,10 +375,27 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
                         <span>In Dialogue</span>
                       </span>
                     )}
+                    {rec.status === 'demo_sent' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold bg-blue-400/20 text-blue-400 border border-blue-400/30 whitespace-nowrap shrink-0">
+                        <Send className="w-3.5 h-3.5 shrink-0" />
+                        <span>Demo Sent</span>
+                      </span>
+                    )}
+                    {rec.status === 'invoice_sent' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold bg-brand-orange/20 text-brand-orange border border-brand-orange/30 whitespace-nowrap shrink-0">
+                        <FileText className="w-3.5 h-3.5 shrink-0" />
+                        <span>Invoice Sent</span>
+                      </span>
+                    )}
                     {rec.status === 'paid_client' && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold bg-brand-green/20 text-brand-green border border-brand-green/40 shadow-green-glow whitespace-nowrap shrink-0">
                         <Check className="w-3.5 h-3.5 stroke-[3] shrink-0" />
                         <span>Paid Client</span>
+                      </span>
+                    )}
+                    {rec.status === 'cold_lead' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold bg-gray-500/20 text-gray-400 border border-gray-500/30 whitespace-nowrap shrink-0">
+                        <span>Cold Lead</span>
                       </span>
                     )}
                   </td>
