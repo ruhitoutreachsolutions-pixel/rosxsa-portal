@@ -216,6 +216,70 @@ export async function saveMasterRecordToSupabase(rec: MasterRecord): Promise<boo
   }
 }
 
+export async function saveBulkMasterRecordsToSupabase(
+  records: MasterRecord[],
+  onProgress?: (completed: number, total: number) => void
+): Promise<{ success: boolean; count: number }> {
+  const client = getSupabase();
+  if (!client || records.length === 0) return { success: false, count: 0 };
+
+  const BATCH_SIZE = 500;
+  let totalUploaded = 0;
+
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const chunk = records.slice(i, i + BATCH_SIZE);
+    const payloads = chunk.map((rec) => {
+      const payload: any = {
+        email: rec.email.toLowerCase().trim(),
+        domain: rec.domain.toLowerCase().trim(),
+        company_name: rec.companyName || null,
+        contact_name: rec.contactName || null,
+        website: rec.website || null,
+        country: rec.country || null,
+        job_title: rec.jobTitle || null,
+        phone: rec.phone || null,
+        linkedin_url: rec.linkedInUrl || null,
+        status: rec.status,
+        dnc_reason: rec.dncReason || null,
+        notes: rec.notes || null,
+        lead_gen_rep: rec.leadGenRep || null,
+        sales_rep: rec.salesRep || null,
+        meeting_count_type: rec.meetingCountType || null,
+        audit_history: rec.auditHistory || [],
+        created_by: rec.createdBy || null,
+        updated_at: new Date().toISOString(),
+      };
+      if (rec.id && !rec.id.startsWith('master-') && !rec.id.startsWith('bulk-') && rec.id.length >= 32) {
+        payload.id = rec.id;
+      }
+      return payload;
+    });
+
+    try {
+      const { error } = await client
+        .from('master_records')
+        .upsert(payloads, { onConflict: 'email' });
+
+      if (!error) {
+        totalUploaded += chunk.length;
+      } else {
+        console.warn('Batch upsert error:', error.message);
+      }
+    } catch (e) {
+      console.warn('Batch upload error:', e);
+    }
+
+    if (onProgress) {
+      onProgress(Math.min(i + BATCH_SIZE, records.length), records.length);
+    }
+
+    // Yield control briefly between batches
+    await new Promise((r) => setTimeout(r, 10));
+  }
+
+  return { success: true, count: totalUploaded };
+}
+
 export async function deleteMasterRecordFromSupabase(id: string, email?: string): Promise<boolean> {
   const client = getSupabase();
   if (!client) return false;

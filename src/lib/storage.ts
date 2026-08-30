@@ -10,6 +10,7 @@ import {
 } from '../types';
 import { checkInvoiceAging } from './currency';
 import { isFreeEmailDomain, extractNormalizedDomain } from './collisionEngine';
+import { idbGet, idbSet } from './db';
 
 const STORAGE_KEYS = {
   USERS: 'rosxsa_user_accounts',
@@ -172,13 +173,54 @@ export class StorageService {
     return members;
   }
 
+  private static masterRecordsCache: MasterRecord[] | null = null;
+
+  // Initialize async from IndexedDB (handles 100k+ leads without browser storage quota limit)
+  static async initAsync(): Promise<MasterRecord[]> {
+    try {
+      const idbRecords = await idbGet<MasterRecord[]>(STORAGE_KEYS.MASTER);
+      if (idbRecords && idbRecords.length > 0) {
+        this.masterRecordsCache = idbRecords;
+        return idbRecords;
+      }
+    } catch (e) {
+      console.warn('IDB load error:', e);
+    }
+    return this.getMasterRecords();
+  }
+
   // Master Records & Deals
   static getMasterRecords(): MasterRecord[] {
-    return this.load<MasterRecord[]>(STORAGE_KEYS.MASTER, INITIAL_MASTER_RECORDS);
+    if (this.masterRecordsCache !== null) {
+      return this.masterRecordsCache;
+    }
+    const fromLocal = this.load<MasterRecord[]>(STORAGE_KEYS.MASTER, INITIAL_MASTER_RECORDS);
+    this.masterRecordsCache = fromLocal;
+
+    // Asynchronously check IDB in case IDB has more records than localStorage quota allows
+    idbGet<MasterRecord[]>(STORAGE_KEYS.MASTER).then((idbRecords) => {
+      if (idbRecords && idbRecords.length > (this.masterRecordsCache?.length || 0)) {
+        this.masterRecordsCache = idbRecords;
+      }
+    });
+
+    return fromLocal;
   }
 
   static saveMasterRecords(records: MasterRecord[]): void {
-    this.save(STORAGE_KEYS.MASTER, records);
+    this.masterRecordsCache = records;
+    // Attempt saving to localStorage (safe with quota fallback)
+    try {
+      if (records.length < 5000) {
+        localStorage.setItem(STORAGE_KEYS.MASTER, JSON.stringify(records));
+      } else {
+        localStorage.setItem(STORAGE_KEYS.MASTER, JSON.stringify(records.slice(0, 500)));
+      }
+    } catch (e) {
+      console.warn('localStorage quota exceeded, persisted safely to IndexedDB:', e);
+    }
+    // Always persist complete dataset to IndexedDB (virtually unlimited GBs)
+    idbSet(STORAGE_KEYS.MASTER, records);
   }
 
   static getDeals(): Deal[] {

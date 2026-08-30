@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Database,
   Search,
@@ -25,6 +25,10 @@ import {
   Mail,
   Building,
   Globe,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { MasterRecord, LeadStatus, TeamMember, UserAccount, MeetingCountType } from '../../types';
@@ -55,6 +59,8 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
   const [editingRecord, setEditingRecord] = useState<MasterRecord | null>(null);
   const [viewHistoryRecord, setViewHistoryRecord] = useState<MasterRecord | null>(null);
   const [showColFilters, setShowColFilters] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   // Per-column filter states (matching user request)
   const [colFilters, setColFilters] = useState({
@@ -148,6 +154,15 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
     }
     return true;
   });
+
+  // Safe pagination calculation (protects UI performance with 50k+ records)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedRecords = useMemo(() => {
+    const startIndex = (safeCurrentPage - 1) * pageSize;
+    return filtered.slice(startIndex, startIndex + pageSize);
+  }, [filtered, safeCurrentPage, pageSize]);
 
   // Quick Inline Approval for Admins & Sales Reps
   const handleQuickApproveMeeting = (record: MasterRecord, approval: MeetingCountType) => {
@@ -406,26 +421,56 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
 
       {/* Main Database Table Container */}
       <div className="p-6 rounded-2xl bg-brand-navy border border-brand-midnight shadow-card-dark overflow-x-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-brand-midnight">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-brand-midnight gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-mono font-bold text-brand-white uppercase">
-              Master Lead & Client Database ({filtered.length} of {records.length})
+              Master Lead & Client Database ({filtered.length.toLocaleString()} records)
             </span>
             {isAnyColFilterActive && (
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 animate-pulse">
-                Filtered Active
+                Filtered ({filtered.length.toLocaleString()} of {records.length.toLocaleString()})
               </span>
             )}
           </div>
-          {isAnyColFilterActive && (
-            <button
-              onClick={resetAllFilters}
-              className="text-xs text-red-400 hover:text-red-300 font-semibold flex items-center gap-1 transition-colors"
-            >
-              <FilterX className="w-3.5 h-3.5" />
-              <span>Clear Column Filters</span>
-            </button>
-          )}
+
+          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+            {isAnyColFilterActive && (
+              <button
+                onClick={resetAllFilters}
+                className="text-xs text-red-400 hover:text-red-300 font-semibold flex items-center gap-1 transition-colors"
+              >
+                <FilterX className="w-3.5 h-3.5" />
+                <span>Clear Filters</span>
+              </button>
+            )}
+
+            {/* Rows Per Page Selector */}
+            <div className="flex items-center gap-1.5 text-xs text-brand-gray font-mono">
+              <span>Per page:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 rounded bg-brand-black border border-brand-midnight text-brand-white text-xs focus:outline-none focus:border-brand-cyan font-mono"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+                <option value={500}>500</option>
+              </select>
+            </div>
+
+            {/* Quick Page Info */}
+            <div className="flex items-center gap-1 text-xs font-mono text-brand-gray">
+              <span>Page</span>
+              <span className="text-brand-white font-bold">{safeCurrentPage}</span>
+              <span>of</span>
+              <span className="text-brand-white font-bold">{totalPages}</span>
+            </div>
+          </div>
         </div>
 
         <table className="w-full text-left text-xs min-w-[1100px]">
@@ -602,7 +647,7 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
                 </td>
               </tr>
             ) : (
-              filtered.map((rec) => (
+              paginatedRecords.map((rec) => (
                 <tr key={rec.id} className="hover:bg-brand-black/50 transition-colors">
                   {/* Status Badge (Guaranteed 1-Line with Icon) */}
                   <td className="py-3 px-3">
@@ -845,6 +890,88 @@ export const MasterRepository: React.FC<MasterRepositoryProps> = ({
             )}
           </tbody>
         </table>
+
+        {/* Bottom Pagination Controls */}
+        {filtered.length > 0 && (
+          <div className="pt-4 mt-2 border-t border-brand-midnight flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-xs text-brand-gray font-mono">
+              Showing{' '}
+              <span className="text-brand-white font-bold">
+                {((safeCurrentPage - 1) * pageSize + 1).toLocaleString()}
+              </span>{' '}
+              to{' '}
+              <span className="text-brand-white font-bold">
+                {Math.min(safeCurrentPage * pageSize, filtered.length).toLocaleString()}
+              </span>{' '}
+              of{' '}
+              <span className="text-brand-white font-bold">
+                {filtered.length.toLocaleString()}
+              </span>{' '}
+              leads
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {/* First Page */}
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={safeCurrentPage === 1}
+                className="p-1.5 rounded-lg bg-brand-black border border-brand-midnight text-brand-gray hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="First Page"
+              >
+                <ChevronsLeft className="w-4 h-4" />
+              </button>
+
+              {/* Prev Page */}
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safeCurrentPage === 1}
+                className="px-2.5 py-1.5 rounded-lg bg-brand-black border border-brand-midnight text-xs font-semibold text-brand-gray hover:text-white disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Prev</span>
+              </button>
+
+              {/* Page Numbers / Display */}
+              <div className="px-3 py-1 rounded-lg bg-brand-black border border-brand-midnight text-xs font-mono text-brand-white flex items-center gap-1">
+                <span>Page</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={safeCurrentPage}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      setCurrentPage(Math.min(Math.max(1, val), totalPages));
+                    }
+                  }}
+                  className="w-12 text-center bg-brand-midnight border border-white/10 rounded px-1 py-0.5 text-xs text-brand-cyan font-bold focus:outline-none focus:border-brand-cyan"
+                />
+                <span className="text-brand-gray">of {totalPages.toLocaleString()}</span>
+              </div>
+
+              {/* Next Page */}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safeCurrentPage === totalPages}
+                className="px-2.5 py-1.5 rounded-lg bg-brand-black border border-brand-midnight text-xs font-semibold text-brand-gray hover:text-white disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Last Page */}
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={safeCurrentPage === totalPages}
+                className="p-1.5 rounded-lg bg-brand-black border border-brand-midnight text-brand-gray hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Last Page"
+              >
+                <ChevronsRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Edit Record & Meeting Count Modal */}

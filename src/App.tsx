@@ -27,6 +27,7 @@ import {
   getSupabase,
   fetchMasterRecordsFromSupabase,
   saveMasterRecordToSupabase,
+  saveBulkMasterRecordsToSupabase,
   deleteMasterRecordFromSupabase,
   fetchDealsFromSupabase,
   saveDealToSupabase,
@@ -70,6 +71,12 @@ export function App() {
     setDeals(StorageService.getDeals());
     setMasterRecords(StorageService.getMasterRecords());
     setQuotas(StorageService.getQuotas());
+
+    StorageService.initAsync().then((idbRecords) => {
+      if (idbRecords && idbRecords.length > 0) {
+        setMasterRecords(idbRecords);
+      }
+    });
 
     const { url, anonKey } = getStoredSupabaseConfig();
     setIsSupabaseConnected(Boolean(url && anonKey));
@@ -331,10 +338,18 @@ export function App() {
   };
 
   const handleBulkAddMasterRecords = (newRecords: MasterRecord[]) => {
-    const merged = [...newRecords, ...masterRecords];
+    const existingMap = new Map<string, MasterRecord>();
+    // Index existing records
+    masterRecords.forEach((r) => existingMap.set(r.email.toLowerCase().trim(), r));
+    // Overwrite or append new records
+    newRecords.forEach((r) => existingMap.set(r.email.toLowerCase().trim(), r));
+    const merged = Array.from(existingMap.values());
+
     StorageService.saveMasterRecords(merged);
     setMasterRecords(merged);
-    newRecords.forEach((r) => saveMasterRecordToSupabase(r));
+
+    // Efficient chunked background upload to Supabase
+    saveBulkMasterRecordsToSupabase(newRecords);
     broadcastLocalChange();
   };
 
